@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import type { Candidate, ParsingJob } from "@/lib/types"
@@ -33,7 +33,7 @@ export function OnboardingFlow() {
     { id: "profile", label: "2. Profile" }
   ] as const, [])
 
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!accessToken) return
     setCandidateLoading(true)
     setError(null)
@@ -47,12 +47,12 @@ export function OnboardingFlow() {
     } finally {
       setCandidateLoading(false)
     }
-  }
+  }, [accessToken])
 
   useEffect(() => {
     if (!accessToken) return
     fetchProfile()
-  }, [accessToken])
+  }, [accessToken, fetchProfile])
 
   useEffect(() => {
     if (!accessToken) return
