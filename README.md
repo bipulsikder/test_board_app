@@ -2,6 +2,13 @@
 
 Job board + candidate ATS flow (Next.js App Router) backed by Supabase (Auth + Postgres + Storage).
 
+If you are new to this project:
+
+- Start with the **non‑technical product overview**: [docs/product-overview.md](docs/product-overview.md)
+- Then read the **board app architecture doc**: [docs/board-app-architecture.md](docs/board-app-architecture.md)
+
+The rest of this file focuses on local setup.
+
 ## Run locally
 
 ```bash
@@ -56,4 +63,3 @@ This folder is self-contained. To host it as a separate repo:
 2. Commit the copied files.
 3. Add `.env.local` in your deployment platform using `.env.example` as reference.
 4. Deploy as a standard Next.js app (`npm install` + `npm run build` + `npm run start`).
-
