@@ -45,30 +45,37 @@ export function ResumeStep({
             </div>
           ) : null}
 
-          <input
-            type="file"
-            accept=".pdf,.doc,.docx,.txt"
-            onChange={async (e) => {
-              const f = e.target.files?.[0] || null
-              if (!f) return
-              onError(null)
-              await onUploadAndParse(f)
-            }}
-            className="w-full text-sm text-muted-foreground file:mr-3 file:rounded-full file:border file:border-input file:bg-card file:px-4 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent"
-          />
+          <label
+            className={[
+              "group relative grid cursor-pointer place-items-center rounded-3xl border border-dashed bg-background px-6 py-10 text-center transition",
+              busy ? "opacity-80" : "hover:bg-accent"
+            ].join(" ")}
+          >
+            <div className="grid gap-2">
+              <div className="text-sm font-semibold">{needsResume ? "Upload your resume" : "Replace resume"}</div>
+              <div className="text-xs text-muted-foreground">PDF, DOC, DOCX or TXT (max 10MB recommended)</div>
+              {candidate?.file_name ? <div className="text-xs text-muted-foreground">Current: {candidate.file_name}</div> : null}
+            </div>
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              disabled={busy}
+              onChange={async (e) => {
+                const f = e.target.files?.[0] || null
+                if (!f) return
+                onError(null)
+                await onUploadAndParse(f)
+              }}
+              className="sr-only"
+            />
+          </label>
 
           <div className="flex gap-2">
             {!needsResume ? (
-              <Button variant="secondary" onClick={onSkip} disabled={busy} className="flex-1">
+              <Button variant="secondary" onClick={onSkip} disabled={busy} className="flex-1 rounded-xl">
                 Skip
               </Button>
             ) : null}
-            <Button
-              onClick={() => onError("Choose a resume file")}
-              disabled
-              className="flex-1 opacity-0"
-              aria-hidden
-            />
           </div>
 
           {busy ? (

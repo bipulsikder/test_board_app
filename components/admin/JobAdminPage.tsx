@@ -7,7 +7,7 @@ import { Card, CardBody } from "@/components/ui/Card"
 import { Input } from "@/components/ui/Input"
 import { Spinner } from "@/components/ui/Spinner"
 
-type JobRow = Job & { client_id?: string | null; amount?: string | null; skills_required?: string[] | null }
+type JobRow = Job & { client_id?: string | null }
 
 function toSkills(value: string) {
   const list = value
@@ -41,8 +41,12 @@ export function JobAdminPage({ jobs, clients }: { jobs: JobRow[]; clients: Clien
         body: JSON.stringify({
           client_id: row.client_id || null,
           client_name: row.client_id ? (clientsById.get(row.client_id)?.name || null) : row.client_name,
-          amount: (row as any).amount || null,
-          skills_required: (row as any).skills_required || null
+          salary_type: (row as any).salary_type || null,
+          salary_min: typeof (row as any).salary_min === "number" ? (row as any).salary_min : null,
+          salary_max: typeof (row as any).salary_max === "number" ? (row as any).salary_max : null,
+          skills_must_have: Array.isArray((row as any).skills_must_have) ? (row as any).skills_must_have : null,
+          apply_type: (row as any).apply_type || "in_platform",
+          external_apply_url: (row as any).external_apply_url || null
         })
       })
       const data = await res.json()
@@ -61,7 +65,7 @@ export function JobAdminPage({ jobs, clients }: { jobs: JobRow[]; clients: Clien
 
       <div className="grid gap-3">
         {rows.map((job) => {
-          const skillsText = Array.isArray((job as any).skills_required) ? ((job as any).skills_required as string[]).join(", ") : ""
+          const skillsText = Array.isArray((job as any).skills_must_have) ? ((job as any).skills_must_have as string[]).join(", ") : ""
           return (
             <Card key={job.id}>
               <CardBody className="pt-6">
@@ -92,23 +96,71 @@ export function JobAdminPage({ jobs, clients }: { jobs: JobRow[]; clients: Clien
                     </div>
 
                     <div className="grid gap-2">
-                      <div className="text-xs font-medium text-muted-foreground">Amount</div>
+                      <div className="text-xs font-medium text-muted-foreground">Salary min</div>
                       <Input
-                        value={(job as any).amount || ""}
-                        onChange={(e) => setRows((prev) => prev.map((p) => (p.id === job.id ? ({ ...p, amount: e.target.value } as any) : p)))}
-                        placeholder="$ / hour or salary"
+                        value={typeof (job as any).salary_min === "number" ? String((job as any).salary_min) : ""}
+                        onChange={(e) =>
+                          setRows((prev) =>
+                            prev.map((p) =>
+                              p.id === job.id ? ({ ...p, salary_min: e.target.value ? Number(e.target.value) : null } as any) : p
+                            )
+                          )
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <div className="text-xs font-medium text-muted-foreground">Salary max</div>
+                      <Input
+                        value={typeof (job as any).salary_max === "number" ? String((job as any).salary_max) : ""}
+                        onChange={(e) =>
+                          setRows((prev) =>
+                            prev.map((p) =>
+                              p.id === job.id ? ({ ...p, salary_max: e.target.value ? Number(e.target.value) : null } as any) : p
+                            )
+                          )
+                        }
+                        placeholder="0"
                       />
                     </div>
 
                     <div className="grid gap-2 sm:col-span-2">
-                      <div className="text-xs font-medium text-muted-foreground">Skills required (comma separated)</div>
+                      <div className="text-xs font-medium text-muted-foreground">Must-have skills (comma separated)</div>
                       <Input
                         defaultValue={skillsText}
                         onBlur={(e) => {
                           const skills = toSkills(e.target.value)
-                          setRows((prev) => prev.map((p) => (p.id === job.id ? ({ ...p, skills_required: skills } as any) : p)))
+                          setRows((prev) => prev.map((p) => (p.id === job.id ? ({ ...p, skills_must_have: skills } as any) : p)))
                         }}
                         placeholder="Dispatching, TMS, Warehouse ops"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <div className="text-xs font-medium text-muted-foreground">Apply type</div>
+                      <select
+                        value={String((job as any).apply_type || "in_platform")}
+                        onChange={(e) => {
+                          const v = e.target.value
+                          setRows((prev) => prev.map((p) => (p.id === job.id ? ({ ...p, apply_type: v } as any) : p)))
+                        }}
+                        className="h-11 w-full rounded-xl border border-input bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/20"
+                      >
+                        <option value="in_platform">In platform</option>
+                        <option value="external">External apply</option>
+                      </select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <div className="text-xs font-medium text-muted-foreground">External apply URL</div>
+                      <Input
+                        value={typeof (job as any).external_apply_url === "string" ? (job as any).external_apply_url : ""}
+                        onChange={(e) =>
+                          setRows((prev) => prev.map((p) => (p.id === job.id ? ({ ...p, external_apply_url: e.target.value || null } as any) : p)))
+                        }
+                        placeholder="https://company.com/careers/job"
+                        disabled={String((job as any).apply_type || "in_platform") !== "external"}
                       />
                     </div>
                   </div>
@@ -128,4 +180,3 @@ export function JobAdminPage({ jobs, clients }: { jobs: JobRow[]; clients: Clien
     </div>
   )
 }
-

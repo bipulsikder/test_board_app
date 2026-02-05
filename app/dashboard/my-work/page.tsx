@@ -1,5 +1,5 @@
-import { MyWork } from "@/components/dashboard/MyWork"
 import { Suspense } from "react"
+import { MyWork } from "@/components/dashboard/MyWork"
 
 export default function MyWorkPage() {
   return (

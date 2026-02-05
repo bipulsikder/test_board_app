@@ -21,14 +21,17 @@ export async function GET(request: NextRequest) {
 
   const query = supabaseAdmin
     .from("job_invites")
-    .select("id, job_id, email, token, status, sent_at, opened_at, responded_at, applied_at, rejected_at, created_at, jobs(id,title,location,department,type,industry)")
+    .select("id, job_id, email, token, status, sent_at, opened_at, responded_at, applied_at, rejected_at, created_at, jobs(id,title,location,industry,sub_category,employment_type)")
     .order("created_at", { ascending: false })
 
   const { data: invites, error: iErr } = candidateId
     ? await query.or(`candidate_id.eq.${candidateId},email.eq.${user.email}`)
     : await query.eq("email", user.email)
 
-  if (iErr) return NextResponse.json({ error: "Failed to load invites" }, { status: 500 })
+  if (iErr) {
+    console.error("Failed to load invites:", iErr)
+    return NextResponse.json({ error: iErr.message || "Failed to load invites" }, { status: 500 })
+  }
   return NextResponse.json({ invites: invites || [] })
 }
 

@@ -4,21 +4,48 @@ export type Job = {
   id: UUID
   title: string
   description: string | null
-  department: string | null
   location: string | null
-  type: string | null
   status: string | null
-  requirements: string[] | null
-  salary_range: string | null
-  amount?: string | null
   created_at: string | null
   updated_at: string | null
   industry: string | null
+  sub_category?: string | null
   client_name: string | null
   client_id?: UUID | null
-  skills_required?: string[] | null
-  experience_min: number | null
-  experience_max: number | null
+  company_logo_url?: string | null
+  city?: string | null
+  salary_type?: string | null
+  salary_min?: number | null
+  salary_max?: number | null
+  shift_type?: string | null
+  employment_type?: string | null
+  urgency_tag?: string | null
+  openings?: number | null
+  education_min?: string | null
+  experience_min_years?: number | null
+  experience_max_years?: number | null
+  languages_required?: string[] | null
+  english_level?: string | null
+  license_type?: string | null
+  age_min?: number | null
+  age_max?: number | null
+  gender_preference?: string | null
+  role_category?: string | null
+  department_category?: string | null
+  skills_must_have?: string[] | null
+  skills_good_to_have?: string[] | null
+  apply_type?: "in_platform" | "external" | string | null
+  external_apply_url?: string | null
+}
+
+export type JobSection = {
+  id?: UUID
+  job_id: UUID
+  section_key: string
+  heading: string
+  body_md: string
+  sort_order: number
+  is_visible: boolean
 }
 
 export type ClientProfile = {
@@ -68,6 +95,7 @@ export type Candidate = {
   public_profile_slug?: string | null
   looking_for_work?: boolean | null
   open_job_types?: string[] | null
+  preferred_roles?: string[] | null
   available_start_time?: string | null
   available_end_time?: string | null
   work_timezone?: string | null

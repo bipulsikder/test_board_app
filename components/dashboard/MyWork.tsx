@@ -17,7 +17,7 @@ type InviteRow = {
   applied_at: string | null
   rejected_at: string | null
   created_at: string | null
-  jobs?: Pick<Job, "id" | "title" | "location" | "department" | "type" | "industry">
+  jobs?: Pick<Job, "id" | "title" | "location" | "industry" | "sub_category" | "employment_type">
 }
 
 type ApplicationRow = Application & { jobs?: Pick<Job, "id" | "title" | "location"> }
@@ -35,6 +35,11 @@ export function MyWork() {
     return t === "applications" ? "applications" : "invites"
   }, [search])
 
+  const focusApplicationId = useMemo(() => {
+    const v = search.get("applicationId")
+    return v ? v.trim() : ""
+  }, [search])
+
   const [busy, setBusy] = useState(false)
   const [invites, setInvites] = useState<InviteRow[]>([])
   const [applications, setApplications] = useState<ApplicationRow[]>([])
@@ -47,6 +52,15 @@ export function MyWork() {
   }
 
   useEffect(() => {
+    if (!focusApplicationId) return
+    if (tab !== "applications") {
+      const params = new URLSearchParams(search.toString())
+      params.set("tab", "applications")
+      router.replace(`/dashboard/my-work?${params.toString()}`)
+    }
+  }, [focusApplicationId, router, search, tab])
+
+  useEffect(() => {
     if (loading) return
     if (!accessToken) return
 
@@ -54,30 +68,51 @@ export function MyWork() {
     setBusy(true)
     setError(null)
 
-    Promise.all([
-      fetch("/api/candidate/invites", { headers: { Authorization: `Bearer ${accessToken}` } }).then((r) => r.json()),
-      fetch("/api/candidate/applications", { headers: { Authorization: `Bearer ${accessToken}` } }).then((r) => r.json())
-    ])
-      .then(([inv, app]) => {
+    const load = async () => {
+      try {
+        const [invRes, appRes] = await Promise.all([
+          fetch("/api/candidate/invites", { headers: { Authorization: `Bearer ${accessToken}` } }),
+          fetch("/api/candidate/applications", { headers: { Authorization: `Bearer ${accessToken}` } })
+        ])
+
+        const inv = await invRes.json().catch(() => null)
+        const app = await appRes.json().catch(() => null)
         if (!active) return
-        if (inv?.error) throw new Error(inv.error)
-        if (app?.error) throw new Error(app.error)
-        setInvites(inv.invites || [])
-        setApplications(app.applications || [])
-      })
-      .catch((e: any) => {
+
+        if (invRes.ok) setInvites(inv?.invites || [])
+        else setInvites([])
+
+        if (appRes.ok) setApplications(app?.applications || [])
+        else setApplications([])
+
+        const errs: string[] = []
+        if (!invRes.ok) errs.push(inv?.error || "Failed to load invites")
+        if (!appRes.ok) errs.push(app?.error || "Failed to load applications")
+        setError(errs.length ? errs.join(" • ") : null)
+      } catch (e: any) {
         if (!active) return
-        setError(e.message || "Failed to load")
-      })
-      .finally(() => {
+        setError(e?.message || "Failed to load")
+      } finally {
         if (!active) return
         setBusy(false)
-      })
+      }
+    }
+
+    load()
 
     return () => {
       active = false
     }
   }, [accessToken, loading])
+
+  useEffect(() => {
+    if (!focusApplicationId) return
+    if (busy) return
+    if (tab !== "applications") return
+    const el = document.getElementById(`application-${focusApplicationId}`)
+    if (!el) return
+    el.scrollIntoView({ behavior: "smooth", block: "center" })
+  }, [busy, focusApplicationId, tab])
 
   if (!accessToken) {
     return <div className="rounded-3xl border bg-card p-8">{loading ? <Spinner /> : "Unauthorized"}</div>
@@ -131,7 +166,7 @@ export function MyWork() {
                     <div className="min-w-0">
                       <div className="truncate text-base font-semibold">{row.jobs?.title || "Invite"}</div>
                       <div className="mt-1 text-sm text-muted-foreground">
-                        {row.jobs?.location || "Remote"} {row.jobs?.department ? `• ${row.jobs.department}` : ""}
+                        {row.jobs?.location || "Remote"} {row.jobs?.industry ? `• ${row.jobs.industry}` : ""}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="rounded-full border bg-card px-3 py-1.5">{row.status || "sent"}</span>
@@ -187,7 +222,14 @@ export function MyWork() {
           ) : (
             <div className="grid gap-3">
               {applications.map((row) => (
-                <div key={row.id} className="rounded-3xl border bg-background p-5">
+                <div
+                  key={row.id}
+                  id={`application-${row.id}`}
+                  className={[
+                    "rounded-3xl border bg-background p-5",
+                    focusApplicationId && row.id === focusApplicationId ? "border-primary/40 bg-primary/5" : ""
+                  ].join(" ")}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-base font-semibold">{row.jobs?.title || row.job_id}</div>

@@ -11,8 +11,79 @@ import { ProfileStep } from "@/components/apply/ProfileStep"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
 import { Spinner } from "@/components/ui/Spinner"
+import { IndustryGateStep, type LogisticsConnected } from "@/components/onboarding/IndustryGateStep"
+import { SpecializationStep } from "@/components/onboarding/SpecializationStep"
 
-type Step = "resume" | "profile"
+type Step = "gate" | "specialization" | "resume" | "profile"
+
+const DOMAINS = [
+  { id: "cargo", label: "Movement of Goods (Cargo)" },
+  { id: "passenger", label: "Movement of People (Passenger mobility)" }
+] as const
+
+const MODES = [
+  { id: "road", label: "Road" },
+  { id: "rail", label: "Rail" },
+  { id: "air", label: "Air" },
+  { id: "water", label: "Water" },
+  { id: "pipeline", label: "Pipeline" },
+  { id: "multimodal", label: "Multimodal" },
+  { id: "warehousing", label: "Warehousing" }
+] as const
+
+const MODE_CATEGORIES: Record<string, Array<{ id: string; label: string }>> = {
+  road: [
+    { id: "fleet_ops", label: "Fleet Operations" },
+    { id: "last_mile", label: "Last-mile Delivery" },
+    { id: "maintenance", label: "Fleet Management & Maintenance" },
+    { id: "brokerage", label: "Freight Brokerage & Aggregation" },
+    { id: "compliance", label: "Compliance & Documentation" }
+  ],
+  rail: [
+    { id: "terminal_ops", label: "Rail Cargo Operations" },
+    { id: "pft", label: "Private Freight Terminals" },
+    { id: "planning", label: "Rail Logistics Planning" }
+  ],
+  air: [
+    { id: "cargo_ops", label: "Airport Cargo Operations" },
+    { id: "cold_chain", label: "Cold Chain / Pharma" },
+    { id: "documentation", label: "Documentation & Customs" }
+  ],
+  water: [
+    { id: "port_ops", label: "Port & Terminal Operations" },
+    { id: "shipping", label: "Shipping Line Operations" },
+    { id: "customs", label: "Customs & Port Compliance" }
+  ],
+  pipeline: [
+    { id: "pipeline_ops", label: "Pipeline Operations" },
+    { id: "integrity", label: "Integrity / Monitoring" }
+  ],
+  multimodal: [
+    { id: "planning", label: "Multimodal Planning" },
+    { id: "terminal", label: "Intermodal Terminals" }
+  ],
+  warehousing: [
+    { id: "inbound", label: "Inbound" },
+    { id: "inventory", label: "Storage & Inventory" },
+    { id: "outbound", label: "Outbound" },
+    { id: "mhe", label: "Material Handling Equipment" },
+    { id: "cold_storage", label: "Cold Storage / Cold Chain" }
+  ]
+}
+
+function upsertTaggedPrefix(tags: string[] | null | undefined, prefix: string, values: string[]) {
+  const existing = Array.isArray(tags) ? tags.filter((t) => typeof t === "string") : []
+  const kept = existing.filter((t) => !t.startsWith(prefix))
+  return Array.from(new Set([...kept, ...values.map((v) => `${prefix}${v}`)])).slice(0, 60)
+}
+
+function readTaggedPrefix(tags: string[] | null | undefined, prefix: string) {
+  const arr = Array.isArray(tags) ? tags : []
+  return arr
+    .filter((t) => typeof t === "string" && t.startsWith(prefix))
+    .map((t) => String(t).slice(prefix.length))
+    .filter(Boolean)
+}
 
 export function OnboardingFlow() {
   const router = useRouter()
@@ -21,17 +92,33 @@ export function OnboardingFlow() {
   const accessToken = session?.access_token
   const returnTo = useMemo(() => sanitizeReturnTo(search.get("returnTo"), "/jobs"), [search])
 
-  const [step, setStep] = useState<Step>("resume")
+  const [step, setStep] = useState<Step>("gate")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [candidateLoading, setCandidateLoading] = useState(false)
   const [parsingJob, setParsingJob] = useState<ParsingJob | null>(null)
 
-  const steps = useMemo(() => [
-    { id: "resume", label: "1. Resume" },
-    { id: "profile", label: "2. Profile" }
-  ] as const, [])
+  const [logisticsConnected, setLogisticsConnected] = useState<LogisticsConnected>("unknown")
+  const [domain, setDomain] = useState<string>("")
+  const [mode, setMode] = useState<string>("")
+  const [categories, setCategories] = useState<string[]>([])
+
+  const steps = useMemo(() => {
+    if (logisticsConnected === "yes") {
+      return [
+        { id: "gate", label: "1. Your industry" },
+        { id: "specialization", label: "2. Specialization" },
+        { id: "resume", label: "3. Resume" },
+        { id: "profile", label: "4. Profile" }
+      ] as const
+    }
+    return [
+      { id: "gate", label: "1. Your industry" },
+      { id: "resume", label: "2. Resume" },
+      { id: "profile", label: "3. Profile" }
+    ] as const
+  }, [logisticsConnected])
 
   const fetchProfile = useCallback(async () => {
     if (!accessToken) return
@@ -53,6 +140,30 @@ export function OnboardingFlow() {
     if (!accessToken) return
     fetchProfile()
   }, [accessToken, fetchProfile])
+
+  useEffect(() => {
+    const tags = (candidate as any)?.tags as any
+    const connected = readTaggedPrefix(tags, "logistics_connected=")[0]
+    if (connected === "yes") setLogisticsConnected("yes")
+    else if (connected === "no") setLogisticsConnected("no")
+    else setLogisticsConnected("unknown")
+
+    const d = readTaggedPrefix(tags, "logistics_domain=")[0] || ""
+    const m = readTaggedPrefix(tags, "logistics_mode=")[0] || ""
+    const cs = readTaggedPrefix(tags, "logistics_category=")
+    setDomain(d)
+    setMode(m)
+    setCategories(cs)
+
+    if (connected === "no") {
+      setStep("resume")
+    } else if (connected === "yes") {
+      if (!d || !m || !cs.length) setStep("specialization")
+      else setStep("resume")
+    } else {
+      setStep("gate")
+    }
+  }, [candidate])
 
   useEffect(() => {
     if (!accessToken) return
@@ -99,6 +210,67 @@ export function OnboardingFlow() {
       setStep("profile")
     } catch (e: any) {
       setError(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveGate = async (next: LogisticsConnected) => {
+    if (!accessToken) return
+    if (!candidate) {
+      setError("Profile is not ready yet. Please try again in a moment.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const updatedTags = upsertTaggedPrefix(candidate.tags as any, "logistics_connected=", [next])
+      const res = await fetch("/api/candidate/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ tags: updatedTags })
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save")
+      setCandidate((data?.candidate || null) as Candidate | null)
+      if (next === "yes") setStep("specialization")
+      else setStep("resume")
+    } catch (e: any) {
+      setError(e.message || "Failed")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveSpecialization = async () => {
+    if (!accessToken) return
+    if (!candidate) {
+      setError("Profile is not ready yet. Please try again in a moment.")
+      return
+    }
+    if (!domain || !mode || !categories.length) {
+      setError("Select your domain, mode, and at least one specialization.")
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      let tags = Array.isArray(candidate.tags) ? (candidate.tags as any as string[]) : []
+      tags = upsertTaggedPrefix(tags, "logistics_domain=", [domain])
+      tags = upsertTaggedPrefix(tags, "logistics_mode=", [mode])
+      tags = upsertTaggedPrefix(tags, "logistics_category=", categories)
+
+      const res = await fetch("/api/candidate/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ tags })
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to save")
+      setCandidate((data?.candidate || null) as Candidate | null)
+      setStep("resume")
+    } catch (e: any) {
+      setError(e.message || "Failed")
     } finally {
       setBusy(false)
     }
@@ -171,6 +343,40 @@ export function OnboardingFlow() {
         </div>
 
         {error ? <div className="mb-4 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">{error}</div> : null}
+
+        {step === "gate" ? (
+          <IndustryGateStep
+            value={logisticsConnected}
+            busy={busy}
+            disabled={candidateLoading || !candidate}
+            onChange={setLogisticsConnected}
+            onSkip={() => {
+              setLogisticsConnected("no")
+              saveGate("no")
+            }}
+            onContinue={() => saveGate(logisticsConnected)}
+          />
+        ) : null}
+
+        {step === "specialization" ? (
+          <SpecializationStep
+            domain={domain}
+            mode={mode}
+            categories={categories}
+            domains={DOMAINS.slice() as any}
+            modes={MODES.slice() as any}
+            modeCategories={MODE_CATEGORIES}
+            busy={busy}
+            onBack={() => setStep("gate")}
+            onSetDomain={(v) => setDomain(v)}
+            onSetMode={(v) => {
+              setMode(v)
+              setCategories([])
+            }}
+            onToggleCategory={(id) => setCategories((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))}
+            onContinue={saveSpecialization}
+          />
+        ) : null}
 
         {step === "resume" ? (
           <ResumeStep

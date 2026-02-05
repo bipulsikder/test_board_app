@@ -48,8 +48,8 @@ export function ReviewStep({
             <div className="text-sm font-medium">{job.title}</div>
             <div className="flex flex-wrap gap-2 text-xs">
               {job.location ? <Badge>{job.location}</Badge> : null}
-              {job.department ? <Badge>{job.department}</Badge> : null}
-              {job.type ? <Badge>{job.type}</Badge> : null}
+              {job.industry ? <Badge>{job.industry}</Badge> : null}
+              {job.employment_type ? <Badge>{String(job.employment_type).replace(/_/g, " ")}</Badge> : null}
             </div>
           </div>
 

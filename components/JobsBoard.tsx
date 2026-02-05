@@ -66,8 +66,8 @@ export function JobsBoard({ jobs }: { jobs: Job[] }) {
                 className="h-11 w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40"
               >
                 <option value="">Any type</option>
-                <option value="full-time">Full-time</option>
-                <option value="part-time">Part-time</option>
+                <option value="full_time">Full-time</option>
+                <option value="part_time">Part-time</option>
                 <option value="contract">Contract</option>
               </select>
             </div>
@@ -99,8 +99,8 @@ export function JobsBoard({ jobs }: { jobs: Job[] }) {
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold text-white">{job.title}</div>
                             <div className="mt-1 flex flex-wrap gap-2">
-                              {job.department ? <Badge>{job.department}</Badge> : null}
-                              {job.type ? <Badge className="text-white/70">{job.type}</Badge> : null}
+                              {job.industry ? <Badge>{job.industry}</Badge> : null}
+                              {job.employment_type ? <Badge className="text-white/70">{String(job.employment_type).replace(/_/g, " ")}</Badge> : null}
                             </div>
                           </div>
                           <ArrowRight className={active ? "h-4 w-4 text-blue-300" : "h-4 w-4 text-white/30"} />
@@ -133,9 +133,8 @@ export function JobsBoard({ jobs }: { jobs: Job[] }) {
                       <div>
                         <div className="text-lg font-semibold text-white">{selected.title}</div>
                         <div className="mt-2 flex flex-wrap gap-2">
-                          {selected.department ? <Badge>{selected.department}</Badge> : null}
-                          {selected.type ? <Badge className="text-white/70">{selected.type}</Badge> : null}
-                          {selected.industry ? <Badge className="text-white/70">{selected.industry}</Badge> : null}
+                          {selected.industry ? <Badge>{selected.industry}</Badge> : null}
+                          {selected.employment_type ? <Badge className="text-white/70">{String(selected.employment_type).replace(/_/g, " ")}</Badge> : null}
                         </div>
                       </div>
                       <div className="text-sm text-white/60">{selected.description || ""}</div>
@@ -159,4 +158,3 @@ export function JobsBoard({ jobs }: { jobs: Job[] }) {
     </div>
   )
 }
-

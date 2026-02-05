@@ -57,6 +57,24 @@ export function ProfileStep({
               <Input value={candidate.phone || ""} onChange={(e) => setCandidate({ ...candidate, phone: e.target.value })} />
             </div>
 
+            <div className="grid gap-2">
+              <div className="text-xs font-medium text-muted-foreground">Desired role</div>
+              <Input
+                value={candidate.desired_role || ""}
+                onChange={(e) => setCandidate({ ...candidate, desired_role: e.target.value })}
+                placeholder="e.g. Dispatcher"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <div className="text-xs font-medium text-muted-foreground">Current company</div>
+              <Input
+                value={candidate.current_company || ""}
+                onChange={(e) => setCandidate({ ...candidate, current_company: e.target.value })}
+                placeholder="e.g. Delhivery"
+              />
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
                 <div className="text-xs font-medium text-muted-foreground">Current role *</div>
@@ -116,6 +134,24 @@ export function ProfileStep({
                   <option value="no">No</option>
                 </select>
               </div>
+
+              <div className="grid gap-2">
+                <div className="text-xs font-medium text-muted-foreground">Current salary</div>
+                <Input
+                  value={candidate.current_salary || ""}
+                  onChange={(e) => setCandidate({ ...candidate, current_salary: e.target.value })}
+                  placeholder="e.g. ₹25,000 / month"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-xs font-medium text-muted-foreground">Expected salary</div>
+                <Input
+                  value={candidate.expected_salary || ""}
+                  onChange={(e) => setCandidate({ ...candidate, expected_salary: e.target.value })}
+                  placeholder="e.g. ₹35,000 / month"
+                />
+              </div>
               <div className="grid gap-2">
                 <div className="text-xs font-medium text-muted-foreground">Open to shifts</div>
                 <select
@@ -149,6 +185,86 @@ export function ProfileStep({
             <div className="grid gap-2">
               <div className="text-xs font-medium text-muted-foreground">Summary</div>
               <Textarea value={candidate.summary || ""} onChange={(e) => setCandidate({ ...candidate, summary: e.target.value })} />
+            </div>
+
+            <div className="grid gap-3">
+              <div className="text-sm font-semibold">Parsed highlights</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">Highest qualification</div>
+                  <Input
+                    value={candidate.highest_qualification || ""}
+                    onChange={(e) => setCandidate({ ...candidate, highest_qualification: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">Degree</div>
+                  <Input value={candidate.degree || ""} onChange={(e) => setCandidate({ ...candidate, degree: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">Specialization</div>
+                  <Input
+                    value={candidate.specialization || ""}
+                    onChange={(e) => setCandidate({ ...candidate, specialization: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">University</div>
+                  <Input value={candidate.university || ""} onChange={(e) => setCandidate({ ...candidate, university: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <div className="text-xs font-medium text-muted-foreground">Technical skills</div>
+                <Textarea
+                  value={Array.isArray(candidate.technical_skills) ? candidate.technical_skills.join(", ") : ""}
+                  onChange={(e) =>
+                    setCandidate({
+                      ...candidate,
+                      technical_skills: e.target.value
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                    })
+                  }
+                  placeholder="e.g. TMS, WMS, Route planning, Excel"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">Languages</div>
+                  <Textarea
+                    value={Array.isArray(candidate.languages_known) ? candidate.languages_known.join(", ") : ""}
+                    onChange={(e) =>
+                      setCandidate({
+                        ...candidate,
+                        languages_known: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                      })
+                    }
+                    placeholder="e.g. Hindi, English"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="text-xs font-medium text-muted-foreground">Soft skills</div>
+                  <Textarea
+                    value={Array.isArray(candidate.soft_skills) ? candidate.soft_skills.join(", ") : ""}
+                    onChange={(e) =>
+                      setCandidate({
+                        ...candidate,
+                        soft_skills: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                      })
+                    }
+                    placeholder="e.g. Team management, Communication"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

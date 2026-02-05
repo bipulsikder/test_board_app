@@ -11,12 +11,17 @@ export default async function AdminJobsPage() {
     .select("*")
     .order("created_at", { ascending: false })
 
+  const { data: clients } = await supabaseAdmin
+    .from("clients")
+    .select("id,slug,name,logo_url,website,company_type,location,created_at,updated_at")
+    .order("created_at", { ascending: false })
+
   return (
     <div className="grid gap-2">
       <div className="text-lg font-semibold">Manage jobs</div>
       <div className="text-sm text-muted-foreground">Assign clients and add skills for richer job cards.</div>
       <div className="mt-2">
-        <JobAdminPage jobs={(jobs || []) as any as Job[]} clients={[]} />
+        <JobAdminPage jobs={(jobs || []) as any as Job[]} clients={(clients || []) as any} />
       </div>
     </div>
   )

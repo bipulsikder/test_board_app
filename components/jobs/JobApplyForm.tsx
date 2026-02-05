@@ -1,115 +1,145 @@
 "use client"
 
-import { useMemo, useState } from "react"
-import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import type { Job } from "@/lib/types"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
 import { Button } from "@/components/ui/Button"
 import { Card, CardBody } from "@/components/ui/Card"
+import { Modal } from "@/components/ui/Modal"
 import { Spinner } from "@/components/ui/Spinner"
-import { Textarea } from "@/components/ui/Input"
+import { ApplyStepper } from "@/components/ApplyStepper"
+import { AuthStep } from "@/components/apply/AuthStep"
 
 export function JobApplyForm({ job }: { job: Job }) {
   const { session, loading } = useSupabaseSession()
   const accessToken = session?.access_token
   const sp = useSearchParams()
-  const invite = sp.get("invite")
+  const router = useRouter()
+  const pathname = usePathname()
 
-  const [coverLetter, setCoverLetter] = useState("")
+  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState(false)
+  const [applicationId, setApplicationId] = useState<string | null>(null)
 
-  const returnTo = useMemo(() => {
-    const base = `/jobs/${job.id}/apply`
-    return invite ? `${base}?invite=${encodeURIComponent(invite)}` : base
-  }, [job.id, invite])
+  const isExternal = String((job as any).apply_type || "in_platform") === "external"
+  const externalUrl = String((job as any).external_apply_url || "").trim()
 
-  const submit = async () => {
+  useEffect(() => {
+    const shouldOpen = sp.get("apply") === "1"
+    if (shouldOpen) {
+      setOpen(true)
+      const next = new URLSearchParams(sp.toString())
+      next.delete("apply")
+      router.replace(next.toString() ? `${pathname}?${next.toString()}` : pathname, { scroll: false })
+    }
+  }, [pathname, router, sp])
+
+  useEffect(() => {
+    if (!accessToken) {
+      setApplicationId(null)
+      return
+    }
+    let active = true
+    fetch(`/api/candidate/applications?jobId=${encodeURIComponent(job.id)}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(async (r) => {
+        const data = await r.json().catch(() => null)
+        if (!active) return
+        if (!r.ok) return
+        const row = Array.isArray(data?.applications) ? data.applications[0] : null
+        setApplicationId(row?.id ? String(row.id) : null)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [accessToken, job.id])
+
+  const continueExternal = async () => {
     if (!accessToken) return
+    if (!externalUrl) {
+      setError("This job does not have a company apply link yet.")
+      return
+    }
     setBusy(true)
     setError(null)
     try {
-      const res = await fetch("/api/candidate/applications/submit", {
+      const res = await fetch("/api/candidate/external-apply", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({ jobId: job.id, coverLetter, inviteToken: invite })
+        body: JSON.stringify({ jobId: job.id, redirectUrl: externalUrl, referrer: document.referrer || null })
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to submit")
-      setDone(true)
+      const data = await res.json().catch(() => null)
+      if (!res.ok) throw new Error(data?.error || "Failed to continue")
+      window.open(externalUrl, "_blank", "noopener,noreferrer")
+      setOpen(false)
     } catch (e: any) {
-      setError(e.message || "Failed to submit")
+      setError(e.message || "Failed to continue")
     } finally {
       setBusy(false)
     }
   }
 
-  if (!accessToken) {
-    return (
-      <Card>
-        <CardBody className="pt-6">
-          <div className="grid gap-3">
-            <div className="text-base font-semibold">Sign in to apply</div>
-            <div className="text-sm text-muted-foreground">Create an account, then complete your profile to submit.</div>
-            <div className="flex gap-2">
-              <Link className="flex-1" href={`/auth/sign_up?returnTo=${encodeURIComponent(returnTo)}`}>
-                <Button className="w-full">Create account</Button>
-              </Link>
-              <Link className="flex-1" href={`/auth/login?returnTo=${encodeURIComponent(returnTo)}`}>
-                <Button variant="secondary" className="w-full">Log in</Button>
-              </Link>
-            </div>
-            {loading ? <div className="text-xs text-muted-foreground">Checking session…</div> : null}
-          </div>
-        </CardBody>
-      </Card>
-    )
-  }
-
-  if (done) {
-    return (
-      <Card>
-        <CardBody className="pt-6">
-          <div className="grid gap-3">
-            <div className="text-base font-semibold">Application submitted</div>
-            <div className="text-sm text-muted-foreground">You can track updates in your dashboard.</div>
-            <div className="flex gap-2">
-              <Link className="flex-1" href="/dashboard/my-work?tab=applications">
-                <Button className="w-full">Open dashboard</Button>
-              </Link>
-              <Link className="flex-1" href="/jobs">
-                <Button variant="secondary" className="w-full">More jobs</Button>
-              </Link>
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-    )
-  }
+  const ctaLabel = isExternal
+    ? "Apply on company site"
+    : applicationId
+      ? "Applied"
+      : session
+        ? "Apply"
+        : "Upload your CV to apply"
 
   return (
     <Card>
       <CardBody className="pt-6">
-        <div className="grid gap-4">
-          <div>
-            <div className="text-base font-semibold">Apply</div>
-            <div className="mt-1 text-sm text-muted-foreground">Add a quick note (optional) and submit.</div>
-          </div>
-
-          {error ? <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">{error}</div> : null}
-
-          <div className="grid gap-2">
-            <div className="text-xs font-medium text-muted-foreground">Cover letter (optional)</div>
-            <Textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} placeholder="Write a short note…" />
-          </div>
-
-          <Button onClick={submit} disabled={busy} className="h-12">
-            {busy ? <Spinner /> : null}
-            Submit application
-          </Button>
+        <div className="grid gap-3">
+          {applicationId ? (
+            <div className="grid gap-2">
+              <Button variant="secondary" onClick={() => router.push(`/dashboard/my-work?tab=applications&applicationId=${encodeURIComponent(applicationId)}`)} className="w-full h-12">
+                View status
+              </Button>
+              <div className="text-xs text-muted-foreground">You already applied for this job.</div>
+            </div>
+          ) : (
+            <Button onClick={() => setOpen(true)} className="w-full h-12">
+            {loading ? <Spinner /> : null}
+            {ctaLabel}
+            </Button>
+          )}
+          {!session ? <div className="text-xs text-muted-foreground">Takes less than 2 minutes — resume autofill + one‑tap apply.</div> : null}
         </div>
+
+        <Modal open={open} onClose={() => setOpen(false)} title={isExternal ? `Apply on company site — ${job.title}` : `Apply — ${job.title}`}>
+          {error ? <div className="mb-4 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm">{error}</div> : null}
+          {isExternal ? (
+            session ? (
+              <div className="grid gap-4">
+                <div className="rounded-2xl border bg-accent p-4 text-sm text-muted-foreground">
+                  You’ll be redirected to the company’s official job page to complete your application.
+                </div>
+                <Button onClick={continueExternal} disabled={busy} className="h-12">
+                  {busy ? <Spinner /> : null}
+                  Continue to company site
+                </Button>
+              </div>
+            ) : (
+              <AuthStep jobId={job.id} returnTo={`/onboarding?returnTo=${encodeURIComponent(`/jobs/${job.id}?apply=1`)}`} onError={setError} />
+            )
+          ) : applicationId ? (
+            <div className="grid gap-4">
+              <div className="rounded-2xl border bg-accent p-4 text-sm text-muted-foreground">You already applied for this job.</div>
+              <Button
+                variant="secondary"
+                onClick={() => router.push(`/dashboard/my-work?tab=applications&applicationId=${encodeURIComponent(applicationId)}`)}
+                className="h-12"
+              >
+                View status
+              </Button>
+            </div>
+          ) : (
+            <ApplyStepper job={job} />
+          )}
+        </Modal>
       </CardBody>
     </Card>
   )

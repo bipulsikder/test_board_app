@@ -9,6 +9,11 @@ import { Spinner } from "@/components/ui/Spinner"
 export default function ProfilePage() {
   const { session, loading } = useSupabaseSession()
   const accessToken = session?.access_token
+  const googleAvatarUrl =
+    (session?.user?.user_metadata as any)?.avatar_url ||
+    (session?.user?.user_metadata as any)?.picture ||
+    (session?.user?.user_metadata as any)?.photoURL ||
+    null
 
   const [candidate, setCandidate] = useState<Candidate | null>(null)
   const [busy, setBusy] = useState(false)
@@ -46,5 +51,12 @@ export default function ProfilePage() {
   if (error) return <div className="rounded-3xl border bg-card p-8 text-sm">{error}</div>
   if (!candidate) return <div className="rounded-3xl border bg-card p-8 text-sm">Profile not found.</div>
 
-  return <ProfileBraintrust accessToken={accessToken} candidate={candidate} onCandidateUpdated={setCandidate} />
+  return (
+    <ProfileBraintrust
+      accessToken={accessToken}
+      candidate={candidate}
+      onCandidateUpdated={(c) => setCandidate(c as any)}
+      googleAvatarUrl={typeof googleAvatarUrl === "string" ? googleAvatarUrl : undefined}
+    />
+  )
 }

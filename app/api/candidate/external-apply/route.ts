@@ -1,0 +1,44 @@
+import { NextRequest, NextResponse } from "next/server"
+import { supabaseAdmin } from "@/lib/supabaseAdmin"
+import { getAuthedUser } from "@/lib/apiServerAuth"
+
+export const runtime = "nodejs"
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+export async function POST(request: NextRequest) {
+  const { user } = await getAuthedUser(request)
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const body = (await request.json().catch(() => null)) as any
+  const jobId = typeof body?.jobId === "string" ? body.jobId : ""
+  const redirectUrl = typeof body?.redirectUrl === "string" ? body.redirectUrl.trim() : ""
+
+  if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 })
+  if (!redirectUrl) return NextResponse.json({ error: "Missing redirectUrl" }, { status: 400 })
+
+  const { data: candidate } = await supabaseAdmin
+    .from("candidates")
+    .select("id")
+    .or(`auth_user_id.eq.${user.id},email.eq.${user.email}`)
+    .maybeSingle()
+
+  const ua = request.headers.get("user-agent")
+  const referrer = typeof body?.referrer === "string" ? body.referrer : null
+
+  const { error } = await supabaseAdmin.from("external_apply_events").insert({
+    auth_user_id: user.id,
+    candidate_id: candidate?.id || null,
+    job_id: jobId,
+    redirect_url: redirectUrl,
+    user_agent: ua,
+    referrer,
+    created_at: nowIso()
+  })
+
+  if (error) return NextResponse.json({ error: "Failed to record external apply" }, { status: 500 })
+  return NextResponse.json({ success: true })
+}
+

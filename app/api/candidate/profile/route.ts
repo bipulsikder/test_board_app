@@ -47,6 +47,30 @@ function randomSuffix(len = 5) {
   return out
 }
 
+async function pickUniquePublicSlug(desired: string, selfId: string | null | undefined) {
+  const base = slugify(desired)
+  if (!base) return `talent-${randomSuffix(6)}`
+
+  const { data: rows } = await supabaseAdmin
+    .from("candidates")
+    .select("id, public_profile_slug")
+    .like("public_profile_slug", `${base}%`)
+
+  const used = new Set<string>()
+  for (const r of rows || []) {
+    if (!r?.public_profile_slug) continue
+    if (selfId && r.id === selfId) continue
+    used.add(String(r.public_profile_slug))
+  }
+
+  if (!used.has(base)) return base
+  for (let n = 2; n <= 50; n++) {
+    const candidate = `${base}-${n}`
+    if (!used.has(candidate)) return candidate
+  }
+  return `${base}-${randomSuffix(4)}`
+}
+
 export async function GET(request: NextRequest) {
   const { user } = await getAuthedUser(request)
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -101,6 +125,8 @@ export async function PUT(request: NextRequest) {
     "certifications",
     "projects",
     "tags",
+    "preferred_roles",
+    "open_job_types",
     "public_profile_enabled",
     "public_profile_slug"
   ]
@@ -119,6 +145,13 @@ export async function PUT(request: NextRequest) {
   }
   for (const [k, v] of Object.entries(normalizedArrays)) patch[k] = v
 
+  for (const k of ["preferred_roles", "open_job_types"]) {
+    if (k in patch) {
+      const arr = normalizeStringArray(patch[k])
+      patch[k] = arr ?? []
+    }
+  }
+
   if ("projects" in patch) {
     const normalized = normalizeProjects(patch.projects)
     patch.projects = normalized ?? []
@@ -132,7 +165,7 @@ export async function PUT(request: NextRequest) {
 
   const { data: existing, error: findErr } = await supabaseAdmin
     .from("candidates")
-    .select("id, public_profile_slug")
+    .select("id, public_profile_slug, auth_user_id")
     .or(`auth_user_id.eq.${user.id},email.eq.${user.email}`)
     .maybeSingle()
   if (findErr) return NextResponse.json({ error: "Failed to load candidate" }, { status: 500 })
@@ -142,22 +175,18 @@ export async function PUT(request: NextRequest) {
   }
 
   const wantsPublic = Boolean(patch.public_profile_enabled)
-  if (wantsPublic && !patch.public_profile_slug) {
-    const base = slugify(typeof patch.name === "string" && patch.name ? patch.name : user.email.split("@")[0])
-    patch.public_profile_slug = `${base || "talent"}-${randomSuffix(5)}`
+  if (wantsPublic) {
+    const desiredRaw =
+      typeof patch.public_profile_slug === "string" && patch.public_profile_slug.trim()
+        ? patch.public_profile_slug.trim()
+        : typeof patch.name === "string" && patch.name.trim()
+          ? patch.name.trim()
+          : user.email.split("@")[0]
+    patch.public_profile_slug = await pickUniquePublicSlug(desiredRaw, existing?.id)
   }
 
-  if (wantsPublic && typeof patch.public_profile_slug === "string" && patch.public_profile_slug) {
-    const desired = patch.public_profile_slug
-    const { data: clash } = await supabaseAdmin
-      .from("candidates")
-      .select("id")
-      .eq("public_profile_slug", desired)
-      .maybeSingle()
-    if (clash?.id && clash.id !== existing?.id) {
-      patch.public_profile_slug = `${desired}-${randomSuffix(4)}`
-    }
-  }
+  const linkingAuth = Boolean(existing?.id && !existing?.auth_user_id)
+  if (linkingAuth) patch.auth_user_id = user.id
 
   if (existing?.id) {
     const { data: updated, error: updateErr } = await supabaseAdmin
@@ -168,6 +197,22 @@ export async function PUT(request: NextRequest) {
       .single()
 
     if (updateErr) return NextResponse.json({ error: "Failed to update candidate" }, { status: 500 })
+
+    if (linkingAuth) {
+      const now = nowIso()
+      await supabaseAdmin
+        .from("applications")
+        .update({ source: "database > board-app", updated_at: now })
+        .eq("candidate_id", existing.id)
+        .eq("source", "database")
+
+      await supabaseAdmin
+        .from("job_invites")
+        .update({ candidate_id: existing.id, responded_at: now, updated_at: now })
+        .eq("email", user.email)
+        .is("candidate_id", null)
+    }
+
     return NextResponse.json({ candidate: updated })
   }
 
@@ -204,6 +249,18 @@ export async function PUT(request: NextRequest) {
     .select("*")
     .single()
   if (createErr) return NextResponse.json({ error: "Failed to create candidate" }, { status: 500 })
+
+  ;(async () => {
+    try {
+      await supabaseAdmin.from("candidate_notifications").insert({
+        candidate_id: (created as any).id,
+        type: "welcome",
+        payload: { message: "Welcome to Truckinzy. Complete your profile to apply faster." }
+      })
+    } catch {
+      return
+    }
+  })()
 
   return NextResponse.json({ candidate: created })
 }

@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Briefcase, ChevronLeft, ChevronRight, LayoutGrid, LogOut, Sparkles, User } from "lucide-react"
+import { Bell, Briefcase, ChevronLeft, ChevronRight, LayoutGrid, LogOut, User } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
 import { WorkAvailabilityModal } from "@/components/dashboard/WorkAvailabilityModal"
@@ -14,15 +14,22 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname() || ""
   const { session } = useSupabaseSession()
+  const accessToken = session?.access_token
 
   const [menuOpen, setMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
+  const [candidateName, setCandidateName] = useState<string>("")
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [notifBusy, setNotifBusy] = useState(false)
 
   const nav = useMemo<NavItem[]>(
     () => [
-      { label: "Jobs", href: "/jobs", active: (p) => p === "/jobs" || p.startsWith("/jobs/") },
-      { label: "My work", href: "/dashboard/my-work", active: (p) => p === "/dashboard" || p.startsWith("/dashboard/my-work") },
+      { label: "Jobs", href: "/dashboard/jobs", active: (p) => p === "/dashboard" || p === "/dashboard/jobs" || p.startsWith("/dashboard/jobs/") },
+      { label: "My work", href: "/dashboard/my-work?tab=invites", active: (p) => p.startsWith("/dashboard/my-work") },
+      { label: "Profile", href: "/dashboard/profile", active: (p) => p.startsWith("/dashboard/profile") },
       { label: "Career help", href: "#", active: () => false, comingSoon: true },
       { label: "Wallet", href: "#", active: () => false, comingSoon: true },
       { label: "Refer and earn", href: "#", active: () => false, comingSoon: true }
@@ -30,18 +37,70 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     []
   )
 
+  useEffect(() => {
+    if (!accessToken) {
+      setCandidateName("")
+      return
+    }
+    let active = true
+    fetch("/api/candidate/profile", { headers: { Authorization: `Bearer ${accessToken}` } })
+      .then(async (r) => {
+        const data = await r.json().catch(() => null)
+        if (!active) return
+        if (!r.ok) return
+        const name = typeof data?.candidate?.name === "string" ? data.candidate.name : ""
+        setCandidateName(name)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [accessToken])
+
+  const avatarUrl = useMemo(() => {
+    const meta = (session?.user?.user_metadata as any) || {}
+    const url = meta.avatar_url || meta.picture || meta.avatar
+    return typeof url === "string" ? url : ""
+  }, [session?.user?.user_metadata])
+
+  const displayName = useMemo(() => {
+    const meta = (session?.user?.user_metadata as any) || {}
+    const name = meta.full_name || meta.name
+    if (typeof name === "string" && name.trim()) return name.trim()
+    if (candidateName.trim()) return candidateName.trim()
+    return ""
+  }, [candidateName, session?.user?.user_metadata])
+
   const initials = useMemo(() => {
-    const email = session?.user?.email || ""
-    const part = email.split("@")[0] || "U"
-    const words = part.replace(/[._-]+/g, " ").split(" ").filter(Boolean)
+    const src = displayName || "User"
+    const words = src.replace(/[._-]+/g, " ").split(" ").filter(Boolean)
     const a = (words[0]?.[0] || "U").toUpperCase()
     const b = (words[1]?.[0] || "").toUpperCase()
     return `${a}${b}`.slice(0, 2)
-  }, [session?.user?.email])
+  }, [displayName])
+
+  const loadNotifications = useCallback(async () => {
+    if (!accessToken) return
+    setNotifBusy(true)
+    try {
+      const res = await fetch("/api/candidate/notifications", { headers: { Authorization: `Bearer ${accessToken}` } })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) return
+      setNotifications(Array.isArray(data?.notifications) ? data.notifications : [])
+      setUnreadCount(Number(data?.unreadCount || 0) || 0)
+    } finally {
+      setNotifBusy(false)
+    }
+  }, [accessToken])
+
+  useEffect(() => {
+    if (!accessToken) return
+    loadNotifications()
+  }, [accessToken, loadNotifications])
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    router.push("/auth/login")
+    router.push("/jobs")
     router.refresh()
   }
 
@@ -49,33 +108,109 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-[#f6f3ff] pb-20 md:pb-0">
       <header className="sticky top-0 z-40 border-b bg-background/85 backdrop-blur">
         <div className="flex h-16 w-full items-center gap-3 px-6">
-          <Link href="/jobs" className="flex items-center gap-2">
+          <Link href="/dashboard/jobs" className="flex items-center gap-2">
             <div className="h-9 w-9 rounded-xl bg-primary/10" />
             <div className="text-sm font-semibold">Truckinzy</div>
           </Link>
 
-          <div className="hidden flex-1 items-center justify-center gap-2 px-3 md:flex">
-            <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-xs text-muted-foreground">
-              <Sparkles className="h-4 w-4" />
-              AI Resume Builder: Soon
-            </div>
-            <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-xs text-muted-foreground">
-              <Sparkles className="h-4 w-4" />
-              AI Resume Checker: Soon
-            </div>
-            <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-2 text-xs text-muted-foreground">
-              <Sparkles className="h-4 w-4" />
-              AI Cover Letter Generator: Soon
-            </div>
-          </div>
-
           <div className="ml-auto flex items-center gap-2">
+            <div className="relative">
+              <button
+                className="relative h-10 w-10 rounded-full border bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+                onClick={() => {
+                  setNotifOpen((v) => !v)
+                  setMenuOpen(false)
+                  if (!notifOpen) loadNotifications()
+                }}
+                aria-label="Notifications"
+              >
+                <Bell className="mx-auto h-4 w-4" />
+                {unreadCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </button>
+
+              {notifOpen ? (
+                <div className="absolute right-0 top-12 w-[340px] rounded-2xl border bg-card p-2 shadow-lg">
+                  <div className="flex items-center justify-between px-2 py-1">
+                    <div className="text-sm font-semibold">Notifications</div>
+                    <button
+                      className="rounded-xl px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                      onClick={async () => {
+                        if (!accessToken) return
+                        await fetch("/api/candidate/notifications", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+                          body: JSON.stringify({ action: "mark_all_read" })
+                        })
+                        await loadNotifications()
+                      }}
+                    >
+                      Mark all read
+                    </button>
+                  </div>
+
+                  <div className="mt-1 max-h-[360px] overflow-auto">
+                    {notifBusy ? (
+                      <div className="px-3 py-6 text-sm text-muted-foreground">Loading…</div>
+                    ) : notifications.length ? (
+                      <div className="grid gap-1">
+                        {notifications.map((n: any) => (
+                          <button
+                            key={String(n.id)}
+                            className={[
+                              "w-full rounded-xl px-3 py-2 text-left hover:bg-accent",
+                              n.is_read ? "" : "bg-primary/5"
+                            ].join(" ")}
+                            onClick={async () => {
+                              if (!accessToken) return
+                              await fetch("/api/candidate/notifications", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+                                body: JSON.stringify({ action: "mark_read", id: n.id })
+                              })
+                              setNotifOpen(false)
+                              await loadNotifications()
+                              router.push("/dashboard/profile")
+                            }}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium">
+                                  {n.type === "welcome" ? "Welcome" : n.type === "profile_updated" ? "Profile updated" : "Update"}
+                                </div>
+                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                  {typeof n?.payload?.message === "string"
+                                    ? n.payload.message
+                                    : Array.isArray(n?.payload?.changed)
+                                      ? `Updated: ${n.payload.changed.slice(0, 3).join(", ")}${n.payload.changed.length > 3 ? "…" : ""}`
+                                      : "You have a new update."}
+                                </div>
+                              </div>
+                              {!n.is_read ? <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" /> : null}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="px-3 py-6 text-sm text-muted-foreground">No notifications yet.</div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             <button
               className="relative h-10 w-10 rounded-full border bg-card text-sm font-semibold"
-              onClick={() => setMenuOpen((v) => !v)}
+              onClick={() => {
+                setMenuOpen((v) => !v)
+                setNotifOpen(false)
+              }}
               aria-label="Open menu"
             >
-              {initials}
+              {avatarUrl ? <img className="h-full w-full rounded-full object-cover" alt={displayName || "Avatar"} src={avatarUrl} /> : initials}
             </button>
 
             {menuOpen ? (
@@ -86,6 +221,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                   onClick={() => setMenuOpen(false)}
                 >
                   Profile
+                </Link>
+                <Link
+                  className="block rounded-xl px-3 py-2 text-sm hover:bg-accent"
+                  href="/onboarding?returnTo=%2Fdashboard%2Fprofile"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  Edit onboarding
                 </Link>
                 <button
                   className="block w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-accent"
@@ -112,35 +254,45 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="flex w-full gap-6 px-6 py-6">
-        <aside className="hidden md:block">
-          <div
-            className={[
-              "sticky top-24 rounded-3xl border bg-card p-3 shadow-sm",
-              collapsed ? "w-[84px]" : "w-[280px]"
-            ].join(" ")}
-          >
-            <div className="mb-2 flex items-center justify-between">
+      <div className="flex w-full">
+        <aside
+          className={[
+            "relative hidden md:block shrink-0 border-r bg-card",
+            collapsed ? "w-[72px]" : "w-[240px]"
+          ].join(" ")}
+        >
+          <div className="sticky top-16 h-[calc(100vh-4rem)] overflow-auto p-3">
+            <div className={collapsed ? "flex justify-center" : "flex items-center justify-between"}>
               <div className={["text-xs font-medium text-muted-foreground", collapsed ? "sr-only" : ""].join(" ")}>Navigation</div>
               <button
-                className="rounded-2xl border bg-background p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="rounded-xl border bg-background p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
                 onClick={() => setCollapsed((v) => !v)}
                 aria-label="Toggle sidebar"
               >
                 {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
               </button>
             </div>
-            <nav className="grid gap-1">
+
+            <nav className="mt-3 grid gap-1">
               {nav.map((item) => {
                 const active = item.active(pathname)
                 const disabled = item.comingSoon
-                const icon = item.label === "Jobs" ? <Briefcase className="h-4 w-4" /> : item.label === "My work" ? <LayoutGrid className="h-4 w-4" /> : <User className="h-4 w-4" />
+                const icon =
+                  item.label === "Jobs" ? (
+                    <Briefcase className="h-4 w-4" />
+                  ) : item.label === "My work" ? (
+                    <LayoutGrid className="h-4 w-4" />
+                  ) : item.label === "Profile" ? (
+                    <User className="h-4 w-4" />
+                  ) : (
+                    <User className="h-4 w-4" />
+                  )
                 return (
                   <a
                     key={item.label}
                     href={disabled ? "#" : item.href}
                     className={[
-                      "flex items-center justify-between rounded-2xl px-3 py-2 text-sm",
+                      "flex items-center justify-between rounded-xl px-3 py-2 text-sm",
                       active ? "bg-accent" : "hover:bg-accent",
                       disabled ? "cursor-not-allowed opacity-60" : ""
                     ].join(" ")}
@@ -157,7 +309,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">{children}</main>
+        <main className="min-w-0 flex-1 p-6">{children}</main>
       </div>
 
       <WorkAvailabilityModal open={availabilityOpen} onClose={() => setAvailabilityOpen(false)} />
@@ -165,10 +317,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       <nav className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/85 backdrop-blur md:hidden">
         <div className="flex w-full items-center justify-around px-2 py-2">
           <Link
-            href="/jobs"
+            href="/dashboard/jobs"
             className={[
               "flex flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs",
-              pathname === "/jobs" || pathname.startsWith("/jobs/") ? "bg-accent" : ""
+              pathname === "/dashboard" || pathname.startsWith("/dashboard/jobs") ? "bg-accent" : ""
             ].join(" ")}
           >
             <Briefcase className="h-5 w-5" />
@@ -178,7 +330,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             href="/dashboard/my-work?tab=invites"
             className={[
               "flex flex-col items-center gap-1 rounded-2xl px-4 py-2 text-xs",
-              pathname.startsWith("/dashboard") ? "bg-accent" : ""
+              pathname.startsWith("/dashboard/my-work") ? "bg-accent" : ""
             ].join(" ")}
           >
             <LayoutGrid className="h-5 w-5" />

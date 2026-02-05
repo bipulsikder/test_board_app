@@ -19,14 +19,21 @@ export async function middleware(request: NextRequest) {
 
   if (pathname === "/") {
     const redirectTo = request.nextUrl.clone()
-    redirectTo.pathname = isAuthed ? "/jobs" : "/auth/login"
+    redirectTo.pathname = isAuthed ? "/dashboard/jobs" : "/auth/login"
     redirectTo.search = isAuthed ? "" : "?returnTo=%2Fjobs"
     return NextResponse.redirect(redirectTo)
   }
 
   if (authRoutes.includes(pathname) && isAuthed) {
     const redirectTo = request.nextUrl.clone()
-    redirectTo.pathname = "/jobs"
+    redirectTo.pathname = "/dashboard/jobs"
+    redirectTo.search = ""
+    return NextResponse.redirect(redirectTo)
+  }
+
+  if (pathname === "/jobs" && isAuthed) {
+    const redirectTo = request.nextUrl.clone()
+    redirectTo.pathname = "/dashboard/jobs"
     redirectTo.search = ""
     return NextResponse.redirect(redirectTo)
   }

@@ -25,18 +25,24 @@ export function JobCard({
   href?: string
 }) {
   const tags: { label: string; className?: string }[] = []
-  if (job.type) tags.push({ label: job.type })
-  if (job.department) tags.push({ label: job.department })
+  if (job.employment_type) tags.push({ label: String(job.employment_type).replace(/_/g, " ") })
+  if (job.sub_category) tags.push({ label: String(job.sub_category).replace(/_/g, " ") })
+  if (job.industry) tags.push({ label: job.industry })
   if (isNew(job.created_at)) tags.push({ label: "New", className: "bg-rose-50 text-rose-700 border-rose-200" })
 
   const clientName = client?.name || job.client_name || null
-  const jobHref = href || `/jobs/${job.id}/apply`
+  const jobHref = href || `/jobs/${job.id}`
 
-  const skills = Array.isArray((job as any).skills_required) ? (((job as any).skills_required as any[]).filter((s) => typeof s === "string" && s.trim()) as string[]) : []
+  const skills = Array.isArray((job as any).skills_must_have)
+    ? (((job as any).skills_must_have as any[]).filter((s) => typeof s === "string" && s.trim()) as string[])
+    : []
   const visibleSkills = skills.slice(0, 5)
   const hasMoreSkills = skills.length > 5
 
-  const payLabel = (job as any).amount ? String((job as any).amount) : job.salary_range ? String(job.salary_range) : null
+  const payLabel =
+    (job as any).salary_min || (job as any).salary_max
+      ? `INR ${String((job as any).salary_min || "").replace(/\B(?=(\d{3})+(?!\d))/g, ",")}${(job as any).salary_max ? ` - ${String((job as any).salary_max).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}` : ""}${(job as any).salary_type ? ` / ${String((job as any).salary_type).replace(/_/g, " ")}` : ""}`
+      : null
 
   return (
     <div className="rounded-3xl border bg-card p-6 shadow-sm">
@@ -62,6 +68,9 @@ export function JobCard({
           </div>
 
           <div className="mt-3 grid gap-1">
+            <Link href={jobHref} className="truncate text-xl font-semibold tracking-tight hover:underline hover:underline-offset-4">
+              {job.title}
+            </Link>
             {clientName ? (
               client?.slug ? (
                 <a
@@ -76,9 +85,6 @@ export function JobCard({
                 <div className="truncate text-sm text-muted-foreground">{clientName}</div>
               )
             ) : null}
-            <Link href={jobHref} className="truncate text-xl font-semibold tracking-tight hover:underline hover:underline-offset-4">
-              {job.title}
-            </Link>
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">

@@ -16,11 +16,17 @@ export async function GET(request: NextRequest) {
   if (cErr) return NextResponse.json({ error: "Failed to load candidate" }, { status: 500 })
   if (!candidate?.id) return NextResponse.json({ applications: [] })
 
-  const { data: applications, error: aErr } = await supabaseAdmin
+  const { searchParams } = new URL(request.url)
+  const jobId = searchParams.get("jobId")
+
+  let query = supabaseAdmin
     .from("applications")
     .select("*, jobs(id,title,location)")
     .eq("candidate_id", candidate.id)
-    .order("applied_at", { ascending: false })
+
+  if (jobId) query = query.eq("job_id", jobId)
+
+  const { data: applications, error: aErr } = await query.order("applied_at", { ascending: false })
 
   if (aErr) return NextResponse.json({ error: "Failed to load applications" }, { status: 500 })
   return NextResponse.json({ applications: applications || [] })

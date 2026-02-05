@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import Image from "next/image"
 import type { Candidate } from "@/lib/types"
 import { tagsToMap, mapToTags } from "@/components/apply/tagUtils"
 import { Modal } from "@/components/ui/Modal"
@@ -8,7 +9,12 @@ import { Button } from "@/components/ui/Button"
 import { Input, Textarea } from "@/components/ui/Input"
 import { Badge } from "@/components/ui/Badge"
 import { WorkAvailabilityModal } from "@/components/dashboard/WorkAvailabilityModal"
-import { CalendarDays, ExternalLink, Link2, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
+import { CalendarDays, Camera, ExternalLink, Link2, MapPin, Pencil, Plus, Trash2 } from "lucide-react"
+
+type CandidateLike = Omit<Candidate, "email" | "phone"> & {
+  email?: string
+  phone?: string | null
+}
 
 function initialsFromName(name: string) {
   const parts = (name || "").trim().split(/\s+/).filter(Boolean)
@@ -94,7 +100,25 @@ function serializeProjectItems(items: ProjectItem[]) {
     .filter((it) => typeof it.title === "string" && it.title.trim())
 }
 
-export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }: { accessToken: string; candidate: Candidate; onCandidateUpdated: (c: Candidate) => void }) {
+export function ProfileBraintrust({
+  accessToken,
+  candidate,
+  onCandidateUpdated,
+  googleAvatarUrl,
+  mode = "private",
+  initialWorkItems,
+  initialEducationItems
+}: {
+  accessToken?: string
+  candidate: CandidateLike
+  onCandidateUpdated: (c: CandidateLike) => void
+  googleAvatarUrl?: string
+  mode?: "private" | "public"
+  initialWorkItems?: any[]
+  initialEducationItems?: any[]
+}) {
+  const readonly = mode === "public"
+  const canEdit = !readonly && Boolean(accessToken)
   const [tab, setTab] = useState<"about" | "resume">("about")
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
 
@@ -105,7 +129,7 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
   const [skillsOpen, setSkillsOpen] = useState(false)
   const [certsOpen, setCertsOpen] = useState(false)
 
-  const [workItems, setWorkItems] = useState<any[]>([])
+  const [workItems, setWorkItems] = useState<any[]>(Array.isArray(initialWorkItems) ? initialWorkItems : [])
   const [workOpen, setWorkOpen] = useState(false)
   const [workDraft, setWorkDraft] = useState<any>({
     id: null,
@@ -119,7 +143,7 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
     is_current: false
   })
 
-  const [educationItems, setEducationItems] = useState<any[]>([])
+  const [educationItems, setEducationItems] = useState<any[]>(Array.isArray(initialEducationItems) ? initialEducationItems : [])
   const [educationOpen, setEducationOpen] = useState(false)
   const [educationDraft, setEducationDraft] = useState<any>({
     id: null,
@@ -132,12 +156,52 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
   })
 
   const preferences = useMemo(() => tagsToMap(candidate.tags), [candidate.tags])
+  const profileAvatarUrl = useMemo(() => {
+    const v = preferences.avatar_url
+    return typeof v === "string" ? v.trim() : ""
+  }, [preferences.avatar_url])
+
+  const googleAvatar = useMemo(() => {
+    const v = typeof googleAvatarUrl === "string" ? googleAvatarUrl : ""
+    return v.trim()
+  }, [googleAvatarUrl])
+
+  const avatarUrl = useMemo(() => {
+    return profileAvatarUrl || googleAvatar
+  }, [profileAvatarUrl, googleAvatar])
+
+  const lastUpdatedLabel = useMemo(() => {
+    const raw = (candidate as any)?.updated_at
+    if (!raw) return ""
+    const d = new Date(String(raw))
+    if (Number.isNaN(d.getTime())) return ""
+    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
+  }, [candidate])
   const skills = useMemo(() => {
     const tagSkills = splitSkills(preferences.skills || "")
     const technical = asStringArray(candidate.technical_skills)
     const soft = asStringArray(candidate.soft_skills)
     return uniq([...tagSkills, ...technical, ...soft])
   }, [preferences.skills, candidate.technical_skills, candidate.soft_skills])
+
+  const profileStrength = useMemo(() => {
+    const checks = [
+      Boolean(candidate.summary && String(candidate.summary).trim()),
+      Boolean(candidate.current_role && String(candidate.current_role).trim()),
+      Boolean(candidate.location && String(candidate.location).trim()),
+      Boolean(candidate.total_experience && String(candidate.total_experience).trim()),
+      skills.length > 0,
+      workItems.length > 0,
+      educationItems.length > 0,
+      Boolean(candidate.linkedin_profile || candidate.github_profile || candidate.portfolio_url),
+      Boolean((candidate as any)?.file_url)
+    ]
+    const total = checks.length
+    const done = checks.filter(Boolean).length
+    const pct = total ? Math.round((done / total) * 100) : 0
+    const bars = Math.max(0, Math.min(4, Math.round((pct / 100) * 4)))
+    return { pct, bars }
+  }, [candidate, skills.length, workItems.length, educationItems.length])
 
   const certifications = useMemo(() => asStringArray(candidate.certifications), [candidate.certifications])
   const projectItems = useMemo(() => parseProjectItems(candidate.projects), [candidate.projects])
@@ -181,24 +245,37 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
   }, [candidate.public_profile_enabled, candidate.public_profile_slug, origin])
 
   useEffect(() => {
+    if (!canEdit || !accessToken) return
     fetch("/api/candidate/work-history", { headers: { Authorization: `Bearer ${accessToken}` } })
       .then((r) => r.json())
       .then((d) => setWorkItems(Array.isArray(d?.items) ? d.items : []))
       .catch(() => setWorkItems([]))
-  }, [accessToken])
+  }, [accessToken, canEdit])
 
   useEffect(() => {
+    if (!canEdit || !accessToken) return
     fetch("/api/candidate/education", { headers: { Authorization: `Bearer ${accessToken}` } })
       .then((r) => r.json())
       .then((d) => setEducationItems(Array.isArray(d?.items) ? d.items : []))
       .catch(() => setEducationItems([]))
-  }, [accessToken])
+  }, [accessToken, canEdit])
+
+  useEffect(() => {
+    if (!readonly) return
+    setWorkItems(Array.isArray(initialWorkItems) ? initialWorkItems : [])
+  }, [readonly, initialWorkItems])
+
+  useEffect(() => {
+    if (!readonly) return
+    setEducationItems(Array.isArray(initialEducationItems) ? initialEducationItems : [])
+  }, [readonly, initialEducationItems])
 
   useEffect(() => {
     setProjectsList(projectItems)
   }, [projectItems])
 
   const savePatch = async (patch: Record<string, any>) => {
+    if (!canEdit || !accessToken) throw new Error("Unauthorized")
     const res = await fetch("/api/candidate/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
@@ -207,7 +284,7 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
     const data = await res.json().catch(() => null)
     if (!res.ok) throw new Error(data?.error || "Failed to save")
     onCandidateUpdated(data.candidate)
-    return data.candidate as Candidate
+    return data.candidate as CandidateLike
   }
 
   const primeBioDraft = () => {
@@ -392,6 +469,19 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
     if (data?.candidate) onCandidateUpdated(data.candidate)
   }
 
+  const uploadAvatar = async (file: File) => {
+    const fd = new FormData()
+    fd.append("avatar", file)
+    const res = await fetch("/api/candidate/avatar", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: fd
+    })
+    const data = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(data?.error || "Failed to upload")
+    if (data?.candidate) onCandidateUpdated(data.candidate)
+  }
+
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-card overflow-hidden">
@@ -401,19 +491,40 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
           <div className="relative z-10 -mt-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex items-end gap-4">
               <div className="relative">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border bg-background text-lg font-semibold">
-                  {initialsFromName(candidate.name)}
+                <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border bg-background text-lg font-semibold">
+                  {avatarUrl ? (
+                    <Image src={avatarUrl} alt={candidate.name} width={80} height={80} className="h-full w-full object-cover" unoptimized />
+                  ) : (
+                    initialsFromName(candidate.name)
+                  )}
                 </div>
-                <button
-                  className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full border bg-card hover:bg-accent"
-                  onClick={() => {
-                    primeBioDraft()
-                    setBioOpen(true)
-                  }}
-                  aria-label="Edit profile"
-                >
-                  <Pencil className="h-4 w-4" />
-                </button>
+                {canEdit ? (
+                  <button
+                    className="absolute -right-1 -top-1 flex h-8 w-8 items-center justify-center rounded-full border bg-card hover:bg-accent"
+                    onClick={() => {
+                      primeBioDraft()
+                      setBioOpen(true)
+                    }}
+                    aria-label="Edit profile"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                ) : null}
+
+                {canEdit ? (
+                  <label className="absolute -bottom-1 -right-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-foreground text-background">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f) uploadAvatar(f)
+                      }}
+                    />
+                    <Camera className="h-4 w-4" />
+                  </label>
+                ) : null}
               </div>
 
               <div className="rounded-2xl bg-card/85 px-3 py-2 backdrop-blur">
@@ -426,40 +537,45 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
                     {candidate.location}
                   </span>
                   {candidate.current_role ? <span>• {candidate.current_role}</span> : null}
+                  {lastUpdatedLabel ? <span>• Profile last updated on: {lastUpdatedLabel}</span> : null}
                 </div>
               </div>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => setAvailabilityOpen(true)}>
-                Set work availability
-              </Button>
-              {publicProfileUrl ? (
-                <a href={publicProfileUrl} target="_blank" rel="noopener noreferrer">
-                  <Button variant="secondary">
-                    View public profile <ExternalLink className="ml-2 h-4 w-4" />
+              {canEdit ? (
+                <>
+                  <Button variant="secondary" onClick={() => setAvailabilityOpen(true)}>
+                    Set work availability
                   </Button>
-                </a>
-              ) : (
-                <Button
-                  variant="secondary"
-                  onClick={async () => {
-                    await savePatch({ public_profile_enabled: true })
-                  }}
-                >
-                  Enable public profile
-                </Button>
-              )}
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setWebsitesDraft({ linkedin_profile: candidate.linkedin_profile || "", portfolio_url: candidate.portfolio_url || "", github_profile: candidate.github_profile || "" })
-                  setWebsitesOpen(true)
-                }}
-              >
-                <Link2 className="mr-2 h-4 w-4" />
-                Add websites
-              </Button>
+                  {publicProfileUrl ? (
+                    <a href={publicProfileUrl} target="_blank" rel="noopener noreferrer">
+                      <Button variant="secondary">
+                        View public profile <ExternalLink className="ml-2 h-4 w-4" />
+                      </Button>
+                    </a>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      onClick={async () => {
+                        await savePatch({ public_profile_enabled: true })
+                      }}
+                    >
+                      Enable public profile
+                    </Button>
+                  )}
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setWebsitesDraft({ linkedin_profile: candidate.linkedin_profile || "", portfolio_url: candidate.portfolio_url || "", github_profile: candidate.github_profile || "" })
+                      setWebsitesOpen(true)
+                    }}
+                  >
+                    <Link2 className="mr-2 h-4 w-4" />
+                    Add websites
+                  </Button>
+                </>
+              ) : null}
             </div>
           </div>
 
@@ -496,7 +612,7 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
                 <div className="mt-4">
                   {candidate.summary ? (
                     <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{candidate.summary}</div>
-                  ) : (
+                  ) : canEdit ? (
                     <Button
                       variant="secondary"
                       onClick={() => {
@@ -506,6 +622,8 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
                     >
                       Add bio
                     </Button>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">No bio added yet.</div>
                   )}
                 </div>
               </div>
@@ -515,28 +633,30 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
               <div className="rounded-3xl border bg-card p-6 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-base font-semibold">{candidate.total_experience} in Engineering</div>
+                    <div className="text-base font-semibold">{candidate.total_experience} experience</div>
                     <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
                       <CalendarDays className="h-4 w-4" />
                       {candidate.current_role}
                     </div>
+                    <div className="mt-2 text-sm text-muted-foreground">Profile strength: {profileStrength.pct}%</div>
                   </div>
-                  <button
-                    className="flex h-9 w-9 items-center justify-center rounded-full border bg-card hover:bg-accent"
-                    onClick={() => {
-                      primeBioDraft()
-                      setBioOpen(true)
-                    }}
-                    aria-label="Edit"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  {canEdit ? (
+                    <button
+                      className="flex h-9 w-9 items-center justify-center rounded-full border bg-card hover:bg-accent"
+                      onClick={() => {
+                        primeBioDraft()
+                        setBioOpen(true)
+                      }}
+                      aria-label="Edit"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  ) : null}
                 </div>
                 <div className="mt-6 flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-xl bg-foreground" />
-                  <div className="h-8 w-8 rounded-xl bg-foreground/30" />
-                  <div className="h-8 w-8 rounded-xl bg-foreground/15" />
-                  <div className="h-8 w-8 rounded-xl bg-foreground/5" />
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className={"h-8 w-8 rounded-xl " + (i < profileStrength.bars ? "bg-emerald-600" : "bg-muted")} />
+                  ))}
                 </div>
               </div>
             </div>
@@ -550,43 +670,47 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
                     <div className="text-base font-semibold">Profile details</div>
                     <div className="mt-1 text-sm text-muted-foreground">Make your profile complete for better matching.</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="flex h-9 w-9 items-center justify-center rounded-full border bg-card hover:bg-accent"
-                      onClick={() => {
-                        primeBioDraft()
-                        setBioOpen(true)
-                      }}
-                      aria-label="Edit details"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      className="flex h-9 w-9 items-center justify-center rounded-full border bg-card hover:bg-accent"
-                      onClick={() => {
-                        setWebsitesDraft({ linkedin_profile: candidate.linkedin_profile || "", portfolio_url: candidate.portfolio_url || "", github_profile: candidate.github_profile || "" })
-                        setWebsitesOpen(true)
-                      }}
-                      aria-label="Edit links"
-                    >
-                      <Link2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                  {canEdit ? (
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="flex h-9 w-9 items-center justify-center rounded-full border bg-card hover:bg-accent"
+                        onClick={() => {
+                          primeBioDraft()
+                          setBioOpen(true)
+                        }}
+                        aria-label="Edit details"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        className="flex h-9 w-9 items-center justify-center rounded-full border bg-card hover:bg-accent"
+                        onClick={() => {
+                          setWebsitesDraft({ linkedin_profile: candidate.linkedin_profile || "", portfolio_url: candidate.portfolio_url || "", github_profile: candidate.github_profile || "" })
+                          setWebsitesOpen(true)
+                        }}
+                        aria-label="Edit links"
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-3xl border bg-background p-5">
-                    <div className="text-xs font-medium text-muted-foreground">Contact</div>
-                    <div className="mt-3 grid gap-1 text-sm">
-                      <div className="text-muted-foreground">{candidate.email}</div>
-                      <div>{candidate.phone || "Add phone"}</div>
+                  {canEdit ? (
+                    <div className="rounded-3xl border bg-background p-5">
+                      <div className="text-xs font-medium text-muted-foreground">Contact</div>
+                      <div className="mt-3 grid gap-1 text-sm">
+                        {candidate.email ? <div className="text-muted-foreground">{candidate.email}</div> : null}
+                        <div>{candidate.phone || "Add phone"}</div>
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
                   <div className="rounded-3xl border bg-background p-5">
                     <div className="text-xs font-medium text-muted-foreground">Preferences</div>
                     <div className="mt-3 grid gap-1 text-sm">
-                      <div>{candidate.desired_role || "Add desired role"}</div>
-                      <div className="text-muted-foreground">{candidate.preferred_location || "Add preferred location"}</div>
+                      <div>{candidate.desired_role || (canEdit ? "Add desired role" : "Not provided")}</div>
+                      <div className="text-muted-foreground">{candidate.preferred_location || (canEdit ? "Add preferred location" : "Not provided")}</div>
                       {candidate.current_company ? <div className="text-muted-foreground">{candidate.current_company}</div> : null}
                       {candidate.notice_period ? <div className="text-muted-foreground">Notice: {candidate.notice_period}</div> : null}
                     </div>
@@ -599,21 +723,21 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
                           LinkedIn
                         </a>
                       ) : (
-                        <div className="text-muted-foreground">Add LinkedIn</div>
+                        <div className="text-muted-foreground">{canEdit ? "Add LinkedIn" : "Not provided"}</div>
                       )}
                       {candidate.portfolio_url ? (
                         <a className="text-blue-600 hover:underline" href={candidate.portfolio_url} target="_blank" rel="noopener noreferrer">
                           Portfolio
                         </a>
                       ) : (
-                        <div className="text-muted-foreground">Add portfolio</div>
+                        <div className="text-muted-foreground">{canEdit ? "Add portfolio" : "Not provided"}</div>
                       )}
                       {candidate.github_profile ? (
                         <a className="text-blue-600 hover:underline" href={candidate.github_profile} target="_blank" rel="noopener noreferrer">
                           GitHub
                         </a>
                       ) : (
-                        <div className="text-muted-foreground">Add GitHub</div>
+                        <div className="text-muted-foreground">{canEdit ? "Add GitHub" : "Not provided"}</div>
                       )}
                     </div>
                   </div>
@@ -867,11 +991,24 @@ export function ProfileBraintrust({ accessToken, candidate, onCandidateUpdated }
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {candidate.file_name ? <Badge>{candidate.file_name}</Badge> : <Badge>No resume uploaded</Badge>}
             {candidate.file_url ? (
-              <a href={candidate.file_url} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 hover:underline">
-                View
+              <a
+                href={candidate.file_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in new tab
               </a>
             ) : null}
           </div>
+
+          {candidate.file_url ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border bg-background">
+              <iframe title="Resume preview" src={candidate.file_url} className="h-[520px] w-full" />
+            </div>
+          ) : null}
+
           <div className="mt-5">
             <label className="inline-flex cursor-pointer">
               <input
