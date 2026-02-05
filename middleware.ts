@@ -12,10 +12,19 @@ export async function middleware(request: NextRequest) {
 
   const isAuthed = Boolean(user)
   const { pathname, search } = request.nextUrl
+  const code = request.nextUrl.searchParams.get("code")
+  const error = request.nextUrl.searchParams.get("error")
 
   const fullPath = `${pathname}${search}`
   const authRoutes = ["/auth/login", "/auth/sign_up", "/auth/sign-up", "/auth/signup"]
   const protectedPrefixes = ["/dashboard", "/onboarding"]
+
+  if (pathname === "/" && (code || error)) {
+    const redirectTo = request.nextUrl.clone()
+    redirectTo.pathname = "/auth/callback"
+    if (!redirectTo.searchParams.get("returnTo")) redirectTo.searchParams.set("returnTo", "/jobs?login=1")
+    return NextResponse.redirect(redirectTo)
+  }
 
   if (pathname === "/") {
     const redirectTo = request.nextUrl.clone()

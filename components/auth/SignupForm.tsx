@@ -23,7 +23,7 @@ export function SignupForm() {
     setError(null)
     setMessage(null)
 
-    const origin = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "") || window.location.origin
+    const origin = window.location.origin
     const emailRedirectTo = `${origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
 
     const { error: err } = await supabase.auth.signUp({
@@ -46,7 +46,7 @@ export function SignupForm() {
     setBusy(true)
     setError(null)
     setMessage(null)
-    const origin = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "") || window.location.origin
+    const origin = window.location.origin
     const redirectTo = `${origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
     const { error: err } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } })
     if (err) {

@@ -18,7 +18,10 @@ export function AuthPanel({ title = "Sign in" }: { title?: string }) {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const redirectTo = typeof window !== "undefined" ? `${window.location.origin}${returnTo}` : undefined
+  const redirectTo =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/auth/callback?returnTo=${encodeURIComponent(returnTo.startsWith("/") ? returnTo : "/dashboard")}`
+      : undefined
 
   const signInGoogle = async () => {
     setBusy(true)
@@ -73,4 +76,3 @@ export function AuthPanel({ title = "Sign in" }: { title?: string }) {
     </Card>
   )
 }
-

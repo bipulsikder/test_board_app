@@ -46,7 +46,7 @@ export function AuthStep({
     setBusy(true)
     onError(null)
     ensureAttributionAccepted()
-    const origin = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "") || window.location.origin
+    const origin = window.location.origin
     const redirectTo = `${origin}/auth/callback?returnTo=${encodeURIComponent(returnTo)}`
     await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo } })
     setBusy(false)
