@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import type { Application, Candidate } from "@/lib/types"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders, cachedFetchJson, invalidateSessionCache, peekSessionCache } from "@/lib/http"
 import { AuthPanel } from "@/components/auth/AuthPanel"
 import { ApplicationsList } from "@/components/dashboard/ApplicationsList"
 import { ProfileEditor } from "@/components/dashboard/ProfileEditor"
@@ -15,6 +16,7 @@ export function CandidateDashboard() {
   const router = useRouter()
   const { session, loading } = useSupabaseSession()
   const accessToken = session?.access_token
+  const sessionUserId = (session as any)?.user?.id ? String((session as any).user.id) : ""
 
   const [tab, setTab] = useState<"profile" | "applications">("profile")
   const [candidate, setCandidate] = useState<Candidate | null>(null)
@@ -24,23 +26,45 @@ export function CandidateDashboard() {
 
   const email = useMemo(() => session?.user.email || "", [session])
 
-  const load = async () => {
+  const load = async (opts?: { force?: boolean }) => {
     if (!accessToken) return
+    const force = Boolean(opts?.force)
+    const profileCacheKey = `boardapp:candidateProfile:${sessionUserId || "anon"}`
+    const appsCacheKey = `boardapp:applications:${sessionUserId || "anon"}`
+    if (!force) {
+      const cachedProfile = peekSessionCache<any>(profileCacheKey)
+      const cachedApps = peekSessionCache<any>(appsCacheKey)
+      if (cachedProfile) setCandidate(cachedProfile.candidate || null)
+      if (cachedApps) setApps(cachedApps.applications || [])
+      if (cachedProfile && cachedApps) {
+        setBusy(false)
+        return
+      }
+    }
     setBusy(true)
     setError(null)
     try {
-      const [pRes, aRes] = await Promise.all([
-        fetch("/api/candidate/profile", { headers: { Authorization: `Bearer ${accessToken}` } }),
-        fetch("/api/candidate/applications", { headers: { Authorization: `Bearer ${accessToken}` } })
+      if (force) {
+        invalidateSessionCache(profileCacheKey)
+        invalidateSessionCache(appsCacheKey)
+      }
+
+      const [pJson, aJson] = await Promise.all([
+        cachedFetchJson<any>(
+          profileCacheKey,
+          "/api/candidate/profile",
+          { headers: bearerHeaders(accessToken) },
+          { ttlMs: 5 * 60_000, force },
+        ),
+        cachedFetchJson<any>(
+          appsCacheKey,
+          "/api/candidate/applications",
+          { headers: bearerHeaders(accessToken) },
+          { ttlMs: 60_000, force },
+        )
       ])
 
-      const pJson = await pRes.json()
-      const aJson = await aRes.json()
-
-      if (!pRes.ok) throw new Error(pJson.error || "Failed to load profile")
-      if (!aRes.ok) throw new Error(aJson.error || "Failed to load applications")
-
-      setCandidate(pJson.candidate)
+      setCandidate(pJson.candidate || null)
       setApps(aJson.applications || [])
     } catch (e: any) {
       setError(e.message)
@@ -92,7 +116,7 @@ export function CandidateDashboard() {
         </Button>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="secondary" onClick={() => router.push("/")}>Browse jobs</Button>
-          <Button variant="secondary" onClick={load} disabled={busy}>
+          <Button variant="secondary" onClick={() => load({ force: true })} disabled={busy}>
             {busy ? <Spinner /> : null}
             Refresh
           </Button>
@@ -113,4 +137,3 @@ export function CandidateDashboard() {
     </main>
   )
 }
-

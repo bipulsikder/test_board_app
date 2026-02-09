@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useSearchParams } from "next/navigation"
 import type { Candidate, ParsingJob } from "@/lib/types"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders } from "@/lib/http"
 import { sanitizeReturnTo } from "@/lib/returnTo"
 import { ResumeStep } from "@/components/apply/ResumeStep"
 import { ProfileStep } from "@/components/apply/ProfileStep"
@@ -125,7 +126,7 @@ export function OnboardingFlow() {
     setCandidateLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/candidate/profile", { headers: { Authorization: `Bearer ${accessToken}` } })
+      const res = await fetch("/api/candidate/profile", { headers: bearerHeaders(accessToken) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to load profile")
       setCandidate(data.candidate || null)
@@ -175,7 +176,7 @@ export function OnboardingFlow() {
       try {
         const res = await fetch("/api/candidate/profile", {
           method: "PUT",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
           body: JSON.stringify({
             name: metaName,
             current_role: "Candidate",
@@ -201,7 +202,7 @@ export function OnboardingFlow() {
       const res = await fetch("/api/candidate/resume/parse", {
         method: "POST",
         body: fd,
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: bearerHeaders(accessToken)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to parse")
@@ -227,7 +228,7 @@ export function OnboardingFlow() {
       const updatedTags = upsertTaggedPrefix(candidate.tags as any, "logistics_connected=", [next])
       const res = await fetch("/api/candidate/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({ tags: updatedTags })
       })
       const data = await res.json().catch(() => null)
@@ -262,7 +263,7 @@ export function OnboardingFlow() {
 
       const res = await fetch("/api/candidate/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({ tags })
       })
       const data = await res.json().catch(() => null)
@@ -283,7 +284,7 @@ export function OnboardingFlow() {
     try {
       const res = await fetch("/api/candidate/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: next.name,
           phone: next.phone,

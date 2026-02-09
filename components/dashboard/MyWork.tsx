@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import type { Application, Job } from "@/lib/types"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders } from "@/lib/http"
 import { Spinner } from "@/components/ui/Spinner"
 
 type InviteRow = {
@@ -71,8 +72,8 @@ export function MyWork() {
     const load = async () => {
       try {
         const [invRes, appRes] = await Promise.all([
-          fetch("/api/candidate/invites", { headers: { Authorization: `Bearer ${accessToken}` } }),
-          fetch("/api/candidate/applications", { headers: { Authorization: `Bearer ${accessToken}` } })
+          fetch("/api/candidate/invites", { headers: bearerHeaders(accessToken) }),
+          fetch("/api/candidate/applications", { headers: bearerHeaders(accessToken) })
         ])
 
         const inv = await invRes.json().catch(() => null)
@@ -183,7 +184,7 @@ export function MyWork() {
                             try {
                               const res = await fetch("/api/candidate/invites", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+                                headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
                                 body: JSON.stringify({ inviteId: row.id, action: "reject" })
                               })
                               const data = await res.json().catch(() => null)

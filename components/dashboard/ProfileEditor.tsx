@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import type { Candidate, ParsingJob } from "@/lib/types"
+import { bearerHeaders, invalidateSessionCache } from "@/lib/http"
 import { mapToTags, tagsToMap } from "@/components/apply/tagUtils"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
@@ -38,7 +39,7 @@ export function ProfileEditor({
     try {
       const res = await fetch("/api/candidate/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: draft.name,
           phone: draft.phone,
@@ -60,6 +61,8 @@ export function ProfileEditor({
       if (!res.ok) throw new Error(data.error || "Failed to save")
       onCandidateUpdated(data.candidate)
       setDraft(data.candidate)
+      invalidateSessionCache("boardapp:candidateProfile:", { prefix: true })
+      invalidateSessionCache("boardapp:jobsSearch:", { prefix: true })
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -75,7 +78,7 @@ export function ProfileEditor({
       fd.append("resume", file)
       const res = await fetch("/api/candidate/resume/parse", {
         method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken),
         body: fd
       })
       const data = await res.json()
@@ -85,6 +88,8 @@ export function ProfileEditor({
         onCandidateUpdated(data.candidate)
         setDraft(data.candidate)
       }
+      invalidateSessionCache("boardapp:candidateProfile:", { prefix: true })
+      invalidateSessionCache("boardapp:jobsSearch:", { prefix: true })
     } catch (e: any) {
       setError(e.message)
     } finally {

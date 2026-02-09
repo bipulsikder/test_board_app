@@ -218,7 +218,7 @@ The board app uses **Supabase Auth** in standard email+password + OAuth (Google)
 **Files**
 
 - [app/jobs/page.tsx](../app/jobs/page.tsx)
-- [components/JobsBoard.tsx](../components/JobsBoard.tsx)
+- [components/jobs/JobsBoardClient.tsx](../components/jobs/JobsBoardClient.tsx)
 - [components/jobs/JobsFilters.tsx](../components/jobs/JobsFilters.tsx)
 - [components/jobs/JobCard.tsx](../components/jobs/JobCard.tsx)
 - [app/api/jobs/*] – same backend jobs as internal app
@@ -232,7 +232,6 @@ The Board app reads from the same `jobs` table via public (RLS-protected) APIs e
 - [app/jobs/[id]/apply/page.tsx](../app/jobs/%5Bid%5D/apply/page.tsx)
 - [components/jobs/JobApplyPageClient.tsx](../components/jobs/JobApplyPageClient.tsx)
 - [components/jobs/JobApplyForm.tsx](../components/jobs/JobApplyForm.tsx)
-- [components/ApplyModal.tsx](../components/ApplyModal.tsx)
 - [components/apply/ApplyStepper.tsx](../components/apply/ApplyStepper.tsx)
 - [components/apply/AuthStep.tsx](../components/apply/AuthStep.tsx)
 - [components/apply/ProfileStep.tsx](../components/apply/ProfileStep.tsx)
@@ -244,7 +243,7 @@ The Board app reads from the same `jobs` table via public (RLS-protected) APIs e
 
 1. **Auth step (AuthStep)**
    - If user is not logged in, they must sign in via password or Google.
-   - OAuth uses `NEXT_PUBLIC_SITE_URL`-based callback URL.
+   - OAuth uses the current site origin for the callback URL (avoids localhost redirects in production).
 2. **Resume/profile review**
    - Reuses onboarding components where necessary.
 3. **Review & submit**

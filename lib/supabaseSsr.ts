@@ -3,13 +3,12 @@ import type { CookieOptions } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import type { NextRequest, NextResponse } from "next/server"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+import { SUPABASE_ANON_KEY, SUPABASE_URL } from "@/lib/supabaseEnv"
 
 export function createSupabaseServerClientReadonly() {
   const cookieStore = cookies()
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll()
@@ -22,7 +21,7 @@ export function createSupabaseServerClientReadonly() {
 }
 
 export function createSupabaseMiddlewareClient(request: NextRequest, response: NextResponse) {
-  return createServerClient(supabaseUrl, supabaseAnonKey, {
+  return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return request.cookies.getAll()
@@ -35,4 +34,3 @@ export function createSupabaseMiddlewareClient(request: NextRequest, response: N
     }
   })
 }
-

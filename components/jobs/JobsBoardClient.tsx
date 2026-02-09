@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import type { Candidate, Job } from "@/lib/types"
 import { supabase } from "@/lib/supabase"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders, cachedFetchJson, invalidateSessionCache } from "@/lib/http"
 import { AuthStep } from "@/components/apply/AuthStep"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
@@ -151,6 +152,7 @@ export function JobsBoardClient({
   const profileRef = useRef<HTMLDivElement | null>(null)
   const { session, loading: sessionLoading } = useSupabaseSession()
   const accessToken = session?.access_token
+  const sessionUserId = (session as any)?.user?.id ? String((session as any).user.id) : ""
   const googleAvatarUrl =
     (session as any)?.user?.user_metadata?.avatar_url && typeof (session as any).user.user_metadata.avatar_url === "string"
       ? String((session as any).user.user_metadata.avatar_url)
@@ -322,15 +324,15 @@ export function JobsBoardClient({
       return
     }
     setCandidateLoading(true)
-    fetch("/api/candidate/profile", { headers: { Authorization: `Bearer ${accessToken}` } })
-      .then(async (r) => {
-        const data = await r.json().catch(() => null)
-        if (!r.ok) return null
-        return (data?.candidate || null) as Candidate | null
-      })
-      .then((c) => setCandidate(c))
+    cachedFetchJson<{ candidate: Candidate | null }>(
+      `boardapp:candidateProfile:${sessionUserId || "anon"}`,
+      "/api/candidate/profile",
+      { headers: bearerHeaders(accessToken) },
+      { ttlMs: 5 * 60_000 },
+    )
+      .then((data) => setCandidate((data?.candidate || null) as Candidate | null))
       .finally(() => setCandidateLoading(false))
-  }, [accessToken])
+  }, [accessToken, sessionUserId])
 
   useEffect(() => {
     const v = typeof candidate?.preferred_location === "string" ? candidate.preferred_location.trim() : ""
@@ -388,9 +390,9 @@ export function JobsBoardClient({
       qp.set("limit", "30")
       if (opts.cursor) qp.set("cursor", opts.cursor)
 
-      const res = await fetch(`/api/public/jobs/search?${qp.toString()}`)
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error || "Failed to load jobs")
+      const url = `/api/public/jobs/search?${qp.toString()}`
+      const cacheKey = `boardapp:jobsSearch:${url}`
+      const data = await cachedFetchJson<any>(cacheKey, url, undefined, { ttlMs: 5 * 60_000 })
 
       const pageJobs = Array.isArray(data?.jobs) ? (data.jobs as Job[]) : ([] as Job[])
       const pageClients = data?.clientsById && typeof data.clientsById === "object" ? (data.clientsById as Record<string, ClientLite>) : {}
@@ -536,11 +538,12 @@ export function JobsBoardClient({
     setRoleModalSuggestions([])
     setRoleModalBusy(true)
     try {
-      const res = await fetch("/api/candidate/preferences/suggest", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
-      const data = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(data?.error || "Failed to load suggestions")
+      const data = await cachedFetchJson<any>(
+        `boardapp:preferencesSuggest:${sessionUserId || "anon"}`,
+        "/api/candidate/preferences/suggest",
+        { headers: bearerHeaders(accessToken) },
+        { ttlMs: 30 * 60_000 }
+      )
       const list = Array.isArray(data?.suggested_roles)
         ? (data.suggested_roles as unknown[]).filter((x) => typeof x === "string").map((x) => x.trim()).filter(Boolean)
         : []
@@ -580,6 +583,8 @@ export function JobsBoardClient({
   const signOut = async () => {
     await supabase.auth.signOut()
     setCandidate(null)
+    invalidateSessionCache("boardapp:candidateProfile:", { prefix: true })
+    invalidateSessionCache("boardapp:jobsSearch:", { prefix: true })
   }
 
   const updateCandidate = async (patch: Partial<Candidate>) => {
@@ -589,12 +594,14 @@ export function JobsBoardClient({
     try {
       const res = await fetch("/api/candidate/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify(patch)
       })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || "Failed to update")
       setCandidate((data?.candidate || null) as Candidate | null)
+      invalidateSessionCache("boardapp:candidateProfile:", { prefix: true })
+      invalidateSessionCache("boardapp:jobsSearch:", { prefix: true })
     } catch (e: any) {
       setPrefsError(e.message || "Failed to update")
     } finally {

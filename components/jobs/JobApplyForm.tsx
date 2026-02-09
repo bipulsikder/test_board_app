@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import type { Job } from "@/lib/types"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders } from "@/lib/http"
 import { Button } from "@/components/ui/Button"
 import { Card, CardBody } from "@/components/ui/Card"
 import { Modal } from "@/components/ui/Modal"
@@ -42,7 +43,7 @@ export function JobApplyForm({ job }: { job: Job }) {
       return
     }
     let active = true
-    fetch(`/api/candidate/applications?jobId=${encodeURIComponent(job.id)}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+    fetch(`/api/candidate/applications?jobId=${encodeURIComponent(job.id)}`, { headers: bearerHeaders(accessToken) })
       .then(async (r) => {
         const data = await r.json().catch(() => null)
         if (!active) return
@@ -67,7 +68,7 @@ export function JobApplyForm({ job }: { job: Job }) {
     try {
       const res = await fetch("/api/candidate/external-apply", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({ jobId: job.id, redirectUrl: externalUrl, referrer: document.referrer || null })
       })
       const data = await res.json().catch(() => null)

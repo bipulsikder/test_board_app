@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import type { Candidate } from "@/lib/types"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders } from "@/lib/http"
 import { ProfileBraintrust } from "@/components/dashboard/ProfileBraintrust"
 import { Spinner } from "@/components/ui/Spinner"
 
@@ -24,7 +25,7 @@ export default function ProfilePage() {
     let active = true
     setBusy(true)
     setError(null)
-    fetch("/api/candidate/profile", { headers: { Authorization: `Bearer ${accessToken}` } })
+    fetch("/api/candidate/profile", { headers: bearerHeaders(accessToken) })
       .then((r) => r.json())
       .then((data) => {
         if (!active) return

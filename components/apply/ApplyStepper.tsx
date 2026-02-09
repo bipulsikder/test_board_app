@@ -11,6 +11,7 @@ import { ResumeStep } from "@/components/apply/ResumeStep"
 import { ProfileStep } from "@/components/apply/ProfileStep"
 import { ReviewStep } from "@/components/apply/ReviewStep"
 import { ApplySuccess } from "@/components/apply/ApplySuccess"
+import { bearerHeaders, cachedFetchJson, invalidateSessionCache } from "@/lib/http"
 
 type Step = "auth" | "resume" | "profile" | "review" | "done"
 
@@ -31,6 +32,7 @@ export function ApplyStepper({
 }) {
   const { session, loading } = useSupabaseSession()
   const accessToken = session?.access_token
+  const sessionUserId = (session as any)?.user?.id ? String((session as any).user.id) : ""
   const router = useRouter()
 
   const [step, setStep] = useState<Step>("auth")
@@ -54,11 +56,12 @@ export function ApplyStepper({
     setCandidateLoading(true)
     setError(null)
     try {
-      const res = await fetch("/api/candidate/profile", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to load profile")
+      const data = await cachedFetchJson<any>(
+        `boardapp:candidateProfile:${sessionUserId || "anon"}`,
+        "/api/candidate/profile",
+        { headers: bearerHeaders(accessToken) },
+        { ttlMs: 5 * 60_000 },
+      )
       setCandidate(data.candidate || null)
     } catch (e: any) {
       setError(e.message)
@@ -85,12 +88,14 @@ export function ApplyStepper({
       const res = await fetch("/api/candidate/resume/parse", {
         method: "POST",
         body: fd,
-        headers: { Authorization: `Bearer ${accessToken}` }
+        headers: bearerHeaders(accessToken)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to parse")
       if (data.candidate) setCandidate(data.candidate)
       if (data.parsingJob) setParsingJob(data.parsingJob)
+      invalidateSessionCache("boardapp:candidateProfile:", { prefix: true })
+      invalidateSessionCache("boardapp:jobsSearch:", { prefix: true })
       setStep("profile")
     } catch (e: any) {
       setError(e.message)
@@ -106,7 +111,7 @@ export function ApplyStepper({
     try {
       const res = await fetch("/api/candidate/profile", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           name: next.name,
           phone: next.phone,
@@ -138,6 +143,8 @@ export function ApplyStepper({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to save")
       setCandidate(data.candidate)
+      invalidateSessionCache("boardapp:candidateProfile:", { prefix: true })
+      invalidateSessionCache("boardapp:jobsSearch:", { prefix: true })
       setStep(nextStep)
     } catch (e: any) {
       setError(e.message)
@@ -157,12 +164,13 @@ export function ApplyStepper({
       const attr = getAttribution()
       const res = await fetch("/api/candidate/applications/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({ jobId: job.id, coverLetter, attribution: attr })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to submit")
       if (data?.applicationId) setApplicationId(String(data.applicationId))
+      invalidateSessionCache("boardapp:applications:", { prefix: true })
       setStep("done")
     } catch (e: any) {
       setError(e.message)

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import type { Candidate } from "@/lib/types"
+import { bearerHeaders } from "@/lib/http"
 import { tagsToMap, mapToTags } from "@/components/apply/tagUtils"
 import { Modal } from "@/components/ui/Modal"
 import { Button } from "@/components/ui/Button"
@@ -246,7 +247,7 @@ export function ProfileBraintrust({
 
   useEffect(() => {
     if (!canEdit || !accessToken) return
-    fetch("/api/candidate/work-history", { headers: { Authorization: `Bearer ${accessToken}` } })
+    fetch("/api/candidate/work-history", { headers: bearerHeaders(accessToken) })
       .then((r) => r.json())
       .then((d) => setWorkItems(Array.isArray(d?.items) ? d.items : []))
       .catch(() => setWorkItems([]))
@@ -254,7 +255,7 @@ export function ProfileBraintrust({
 
   useEffect(() => {
     if (!canEdit || !accessToken) return
-    fetch("/api/candidate/education", { headers: { Authorization: `Bearer ${accessToken}` } })
+    fetch("/api/candidate/education", { headers: bearerHeaders(accessToken) })
       .then((r) => r.json())
       .then((d) => setEducationItems(Array.isArray(d?.items) ? d.items : []))
       .catch(() => setEducationItems([]))
@@ -278,7 +279,7 @@ export function ProfileBraintrust({
     if (!canEdit || !accessToken) throw new Error("Unauthorized")
     const res = await fetch("/api/candidate/profile", {
       method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
       body: JSON.stringify(patch)
     })
     const data = await res.json().catch(() => null)
@@ -344,7 +345,7 @@ export function ProfileBraintrust({
     if (workDraft.id) {
       const res = await fetch(`/api/candidate/work-history/${workDraft.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           company: workDraft.company,
           role: workDraft.role,
@@ -366,7 +367,7 @@ export function ProfileBraintrust({
 
     const res = await fetch("/api/candidate/work-history", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
       body: JSON.stringify({
         company: workDraft.company,
         role: workDraft.role,
@@ -386,7 +387,7 @@ export function ProfileBraintrust({
   }
 
   const deleteWork = async (id: string) => {
-    const res = await fetch(`/api/candidate/work-history/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } })
+    const res = await fetch(`/api/candidate/work-history/${id}`, { method: "DELETE", headers: bearerHeaders(accessToken) })
     if (res.ok) setWorkItems((prev) => prev.filter((x) => x.id !== id))
   }
 
@@ -414,7 +415,7 @@ export function ProfileBraintrust({
     if (educationDraft.id) {
       const res = await fetch(`/api/candidate/education/${educationDraft.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify({
           degree: educationDraft.degree,
           institution: educationDraft.institution,
@@ -434,7 +435,7 @@ export function ProfileBraintrust({
 
     const res = await fetch("/api/candidate/education", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
       body: JSON.stringify({
         degree: educationDraft.degree,
         institution: educationDraft.institution,
@@ -452,7 +453,7 @@ export function ProfileBraintrust({
   }
 
   const deleteEducation = async (id: string) => {
-    const res = await fetch(`/api/candidate/education/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${accessToken}` } })
+    const res = await fetch(`/api/candidate/education/${id}`, { method: "DELETE", headers: bearerHeaders(accessToken) })
     if (res.ok) setEducationItems((prev) => prev.filter((x) => x.id !== id))
   }
 
@@ -461,7 +462,7 @@ export function ProfileBraintrust({
     fd.append("resume", file)
     const res = await fetch("/api/candidate/resume/parse", {
       method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken),
       body: fd
     })
     const data = await res.json().catch(() => null)
@@ -474,7 +475,7 @@ export function ProfileBraintrust({
     fd.append("avatar", file)
     const res = await fetch("/api/candidate/avatar", {
       method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken),
       body: fd
     })
     const data = await res.json().catch(() => null)

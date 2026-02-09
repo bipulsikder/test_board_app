@@ -9,6 +9,57 @@ If you are new to this project:
 
 The rest of this file focuses on local setup.
 
+## What this repo is (and is not)
+
+- This is the **candidate-facing** application: public jobs, apply flow, onboarding, and the candidate dashboard.
+- The internal/admin application lives in a different repo (your internal app). Both apps read/write the same Supabase project.
+
+## Repo structure
+
+```
+app/
+  api/                  # Route handlers (server-side)
+  auth/                 # Auth pages + callback exchange
+  dashboard/            # Candidate dashboard routes
+  jobs/                 # Public jobs and job details
+components/
+  apply/                # Apply stepper UI
+  dashboard/            # Profile editor, my work, availability
+  jobs/                 # Jobs board client, filters, cards
+  ui/                   # Reusable UI primitives
+lib/
+  constants/            # Shared constants (single source of truth)
+  http.ts               # Shared fetch helpers (auth headers)
+  returnTo.ts           # Safe returnTo sanitizer
+  supabase*.ts          # Supabase clients (browser/server/admin)
+docs/
+  board-app-architecture.md
+  product-overview.md
+supabase/
+  migrations/
+```
+
+## Codebase conventions (keep it easy for future devs)
+
+### 1) Keep route handlers thin
+
+- `app/api/**/route.ts` should validate input + call a function from `lib/`.
+- Any non-trivial logic goes in `lib/` so it can be reused and tested.
+
+### 2) One source of truth for configuration
+
+- Supabase public env values are centralized in [supabaseEnv.ts](lib/supabaseEnv.ts).
+- Storage bucket names are centralized in [storage.ts](lib/constants/storage.ts).
+
+### 3) Avoid duplicating auth header boilerplate
+
+- Use `bearerHeaders()` from [http.ts](lib/http.ts) for authenticated fetch calls.
+
+### 4) Keep backward-compatible routes without copying logic
+
+- If you must support multiple URL aliases (example: `/auth/signup` vs `/auth/sign-up`), keep both routes but share logic via a small helper.
+  - See [app/auth/redirects.ts](app/auth/redirects.ts)
+
 ## Run locally
 
 ```bash
@@ -18,6 +69,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+Node requirement: `>=20.9.0` (see `engines.node` in `package.json`).
 
 ## Environment variables
 

@@ -98,6 +98,12 @@ export async function parseResume(file: any): Promise<ComprehensiveCandidateData
   }
 }
 
+function isExtractionErrorMarker(text: string): boolean {
+  const t = String(text || "").trim()
+  if (!t) return false
+  return /^(error extracting text from|doc processing error:)/i.test(t)
+}
+
 // Function to validate parsed data quality with confidence scoring
 function isValidParsedData(data: any): boolean {
   // Must have a valid name (not empty, not "unknown", not just whitespace)
@@ -112,7 +118,7 @@ function isValidParsedData(data: any): boolean {
 
   // Must have readable resume text content
   const resumeText = (data.resumeText || "").trim()
-  const resumeTextLooksErroneous = /error|processing error|extraction failed/i.test(resumeText)
+  const resumeTextLooksErroneous = isExtractionErrorMarker(resumeText)
   if (!resumeText || resumeText.length < 50 || resumeTextLooksErroneous) {
     console.log("❌ Missing or invalid resume content")
     return false

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Bell, Briefcase, ChevronLeft, ChevronRight, LayoutGrid, LogOut, User } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders } from "@/lib/http"
 import { WorkAvailabilityModal } from "@/components/dashboard/WorkAvailabilityModal"
 
 type NavItem = { label: string; href: string; active: (p: string) => boolean; comingSoon?: boolean }
@@ -43,7 +44,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       return
     }
     let active = true
-    fetch("/api/candidate/profile", { headers: { Authorization: `Bearer ${accessToken}` } })
+    fetch("/api/candidate/profile", { headers: bearerHeaders(accessToken) })
       .then(async (r) => {
         const data = await r.json().catch(() => null)
         if (!active) return
@@ -83,7 +84,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     if (!accessToken) return
     setNotifBusy(true)
     try {
-      const res = await fetch("/api/candidate/notifications", { headers: { Authorization: `Bearer ${accessToken}` } })
+      const res = await fetch("/api/candidate/notifications", { headers: bearerHeaders(accessToken) })
       const data = await res.json().catch(() => null)
       if (!res.ok) return
       setNotifications(Array.isArray(data?.notifications) ? data.notifications : [])
@@ -142,7 +143,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                         if (!accessToken) return
                         await fetch("/api/candidate/notifications", {
                           method: "POST",
-                          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+                          headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
                           body: JSON.stringify({ action: "mark_all_read" })
                         })
                         await loadNotifications()
@@ -168,7 +169,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                               if (!accessToken) return
                               await fetch("/api/candidate/notifications", {
                                 method: "POST",
-                                headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+                                headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
                                 body: JSON.stringify({ action: "mark_read", id: n.id })
                               })
                               setNotifOpen(false)

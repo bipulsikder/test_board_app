@@ -5,6 +5,7 @@ import { Modal } from "@/components/ui/Modal"
 import { Button } from "@/components/ui/Button"
 import { Spinner } from "@/components/ui/Spinner"
 import { useSupabaseSession } from "@/lib/useSupabaseSession"
+import { bearerHeaders } from "@/lib/http"
 
 type Availability = {
   looking_for_work: boolean
@@ -68,7 +69,7 @@ export function WorkAvailabilityModal({ open, onClose }: { open: boolean; onClos
     if (!accessToken) return
     setLoading(true)
     setError(null)
-    fetch("/api/candidate/availability", { headers: { Authorization: `Bearer ${accessToken}` } })
+    fetch("/api/candidate/availability", { headers: bearerHeaders(accessToken) })
       .then(async (r) => {
         const j = await r.json().catch(() => null)
         if (!r.ok) throw new Error(j?.error || "Failed to load")
@@ -113,7 +114,7 @@ export function WorkAvailabilityModal({ open, onClose }: { open: boolean; onClos
     try {
       const res = await fetch("/api/candidate/availability", {
         method: "PUT",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        headers: bearerHeaders(accessToken, { "Content-Type": "application/json" }),
         body: JSON.stringify(data)
       })
       const j = await res.json().catch(() => null)
